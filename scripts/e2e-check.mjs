@@ -28,15 +28,34 @@ page.on('console', (m) => {
 const shot = (name) => page.screenshot({ path: `${SHOTS}/${name}.png` })
 const step = (s) => console.log(`\n== ${s}`)
 
-// Chromium cannot tunnel HTTPS through this sandbox's egress proxy, so wger API
-// calls are fulfilled with a real captured response (the live API shape + CORS
-// were verified with curl). On a real device the app talks to wger.de directly.
+// Chromium cannot tunnel HTTPS through this sandbox's egress proxy, so external
+// API calls are fulfilled with real captured responses (live API shapes + CORS
+// were verified with curl). On a real device the app talks to the APIs directly.
+const { readFileSync, existsSync } = await import('node:fs')
 const FIXTURE = process.env.WGER_FIXTURE
 if (FIXTURE) {
-  const { readFileSync } = await import('node:fs')
   await page.route('**wger.de/api/v2/exerciseinfo/**', (route) =>
     route.fulfill({ contentType: 'application/json', body: readFileSync(FIXTURE, 'utf8') }),
   )
+}
+const FIX_DIR = process.env.FIXTURE_DIR
+const foodFixtures = FIX_DIR && existsSync(`${FIX_DIR}/fix-off-search.json`)
+if (foodFixtures) {
+  const json = (name) => readFileSync(`${FIX_DIR}/${name}`, 'utf8')
+  await page.route('**world.openfoodfacts.org/cgi/search.pl*', (route) =>
+    route.fulfill({ contentType: 'application/json', body: json('fix-off-search.json') }),
+  )
+  await page.route('**world.openfoodfacts.org/api/v2/product/**', (route) =>
+    route.fulfill({ contentType: 'application/json', body: json('fix-off-barcode.json') }),
+  )
+  await page.route('**themealdb.com/api/**', (route) => {
+    const url = route.request().url()
+    if (url.includes('random.php')) {
+      const first = JSON.parse(json('fix-mealdb-search.json')).meals[0]
+      return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ meals: [first] }) })
+    }
+    return route.fulfill({ contentType: 'application/json', body: json('fix-mealdb-search.json') })
+  })
 }
 
 step('load app')
@@ -176,6 +195,77 @@ try {
   await shot('7-online-search-FAILED')
 }
 
+if (foodFixtures) {
+  step('nutrition settings + TDEE calculator')
+  await page.getByRole('link', { name: /Settings/ }).click()
+  await page.getByRole('heading', { name: 'Nutrition' }).waitFor()
+  await page.locator('label:has-text("Height (cm)") input').fill('180')
+  await page.locator('label:has-text("Birth year") input').fill('1998')
+  await page.locator('label:has-text("Activity level") select').selectOption('moderate')
+  await page.locator('label:has-text("Goal") select').selectOption('cut')
+  await page.getByRole('button', { name: 'Calculate suggested targets' }).click()
+  await page.getByText(/Suggested: \d+ kcal/).waitFor()
+  // the live-query re-render can lag the click by a tick
+  await page.waitForFunction(
+    () => [...document.querySelectorAll('label')].some((l) => l.textContent.includes('kcal target') && l.querySelector('input')?.value),
+  )
+  const kcalTarget = await page.locator('label:has-text("kcal target") input').inputValue()
+  console.log('calculated kcal target:', kcalTarget)
+
+  step('diary: log food via online search')
+  await page.locator('.bottom-nav').getByRole('link', { name: 'Food' }).click()
+  await page.getByText('Set your calorie & macro targets', { exact: false }).waitFor({ state: 'hidden' }).catch(() => {})
+  await page.locator('.card', { hasText: 'Breakfast' }).getByRole('button', { name: '+ Add food' }).click()
+  await page.getByPlaceholder('Search foods…').fill('greek yogurt')
+  await page.getByRole('button', { name: /Search online/ }).click()
+  await page.locator('.list-item', { hasText: 'Open Food Facts' }).first().click()
+  await page.getByRole('heading', { name: 'How much?' }).or(page.getByText('How much?')).first().waitFor()
+  await shot('10-food-portion')
+  await page.locator('label:has-text("Amount (grams)") input').fill('170')
+  await page.getByRole('button', { name: 'Add to diary' }).click()
+  const breakfastKcal = await page.locator('.card', { hasText: 'Breakfast' }).locator('.muted.small').first().textContent()
+  console.log('breakfast subtotal:', breakfastKcal?.trim())
+
+  step('diary: quick add')
+  await page.locator('.card', { hasText: 'Lunch' }).getByRole('button', { name: '+ Add food' }).click()
+  await page.getByRole('button', { name: '⚡ Quick add' }).click()
+  await page.locator('label:has-text("Calories (kcal)") input').fill('350')
+  await page.locator('label:has-text("Protein (g)") input').fill('30')
+  await page.getByRole('button', { name: 'Add to diary' }).click()
+
+  step('diary: barcode manual lookup')
+  await page.locator('.card', { hasText: 'Dinner' }).getByRole('button', { name: '+ Add food' }).click()
+  await page.getByRole('button', { name: '📷 Scan' }).click()
+  await page.getByPlaceholder('e.g. 0894700010137').fill('0894700010137')
+  await page.getByRole('button', { name: 'Look up' }).click()
+  await page.getByText('Greek Yogurt Nonfat Plain').first().waitFor()
+  await page.getByRole('button', { name: '1 serving' }).click()
+  await page.getByRole('button', { name: 'Add to diary' }).click()
+  await shot('11-food-diary')
+
+  step('recipes: search, save, add to plan')
+  await page.getByRole('button', { name: 'Recipes', exact: true }).click()
+  await page.getByPlaceholder(/Search recipes/).fill('chicken curry')
+  await page.getByRole('button', { name: 'Search', exact: true }).click()
+  await page.locator('.recipe-card').first().waitFor()
+  await shot('12-recipes-results')
+  await page.locator('.recipe-card').first().click()
+  await page.getByRole('heading', { name: 'Ingredients' }).waitFor()
+  await shot('13-recipe-detail')
+  await page.getByRole('button', { name: '☆ Save to cookbook' }).click()
+  await page.getByRole('button', { name: '★ Saved — remove' }).waitFor()
+  await page.getByRole('button', { name: '📅 Add to plan' }).click()
+  await page.getByRole('button', { name: 'Add to plan', exact: true }).click()
+  await page.getByText('Added to your meal plan ✔').waitFor()
+
+  step('meal plan week view')
+  await page.getByRole('button', { name: '‹ Back' }).click()
+  await page.getByRole('button', { name: 'Plan', exact: true }).click()
+  await page.getByText('Katsu Chicken curry').first().waitFor()
+  console.log('plan shows the saved recipe on today ✔')
+  await shot('14-meal-plan')
+}
+
 step('settings + export')
 await page.getByRole('link', { name: /Settings/ }).click()
 await page.getByRole('heading', { name: 'Backup' }).waitFor()
@@ -185,12 +275,15 @@ await page.getByRole('button', { name: 'Export data' }).click()
 const download = await dl
 console.log('export filename:', download.suggestedFilename())
 const path = await download.path()
-const { readFileSync } = await import('node:fs')
 const backup = JSON.parse(readFileSync(path, 'utf8'))
 console.log('backup contents:', {
   exercises: backup.exercises.length,
   routines: backup.routines.length,
   workouts: backup.workouts.length,
+  foods: backup.foods?.length,
+  foodLogs: backup.foodLogs?.length,
+  recipes: backup.recipes?.length,
+  planEntries: backup.planEntries?.length,
 })
 
 step('offline check (block network, reload)')

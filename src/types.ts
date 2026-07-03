@@ -50,12 +50,24 @@ export interface Workout {
   entries: WorkoutEntry[]
 }
 
+export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'veryActive'
+export type Goal = 'cut' | 'maintain' | 'bulk'
+
 export interface Settings {
   id: 'main'
   units: Units
   sex: Sex
   bodyweightKg?: number
   restSeconds: number
+  // nutrition
+  heightCm?: number
+  birthYear?: number
+  activityLevel?: ActivityLevel
+  goal?: Goal
+  kcalTarget?: number
+  proteinTarget?: number
+  carbsTarget?: number
+  fatTarget?: number
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -63,4 +75,76 @@ export const DEFAULT_SETTINGS: Settings = {
   units: 'lb',
   sex: 'male',
   restSeconds: 120,
+}
+
+// ---- nutrition ----
+
+export interface MacroSet {
+  kcal: number
+  protein: number
+  carbs: number
+  fat: number
+}
+
+export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack'
+export const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack']
+export type PlanMeal = 'breakfast' | 'lunch' | 'dinner'
+export const PLAN_MEALS: PlanMeal[] = ['breakfast', 'lunch', 'dinner']
+
+export interface Food {
+  id: string
+  name: string
+  brand?: string
+  per100g: MacroSet
+  /** grams in one serving, when known */
+  servingG?: number
+  imageUrl?: string
+  source: 'off' | 'custom'
+  offCode?: string
+  favorite: 0 | 1
+  lastUsedAt?: number
+}
+
+export interface FoodLog {
+  id: string
+  date: string // YYYY-MM-DD
+  meal: MealSlot
+  foodId?: string
+  name: string
+  /** 0 for quick-add entries without a weight */
+  grams: number
+  kcal: number
+  protein: number
+  carbs: number
+  fat: number
+  loggedAt: number
+}
+
+export interface RecipeIngredient {
+  name: string
+  measure: string
+}
+
+export interface Recipe {
+  id: string
+  name: string
+  category: string
+  area: string
+  instructions: string
+  imageUrl?: string
+  videoUrl?: string
+  sourceUrl?: string
+  ingredients: RecipeIngredient[]
+  source: 'mealdb' | 'custom'
+  mealdbId?: string
+  inCookbook: 0 | 1
+  savedAt: number
+}
+
+export interface PlanEntry {
+  id: string
+  date: string // YYYY-MM-DD
+  meal: PlanMeal
+  recipeId?: string
+  title: string
 }

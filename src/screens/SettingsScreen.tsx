@@ -2,7 +2,8 @@ import { useRef, useState } from 'react'
 import { db, exportBackup, importBackup } from '../db'
 import { useSettings } from '../hooks/useSettings'
 import { formatWeight, toKg } from '../lib/units'
-import type { Settings } from '../types'
+import { ACTIVITY_LABELS, GOAL_LABELS, suggestTargets } from '../lib/nutrition'
+import type { ActivityLevel, Goal, Settings } from '../types'
 
 export default function SettingsScreen() {
   const settings = useSettings()
@@ -88,6 +89,74 @@ export default function SettingsScreen() {
         />
       </label>
 
+      <h2>Nutrition</h2>
+      <NumSetting
+        label="Height (cm)"
+        value={settings.heightCm}
+        onChange={(v) => save({ heightCm: v })}
+        placeholder="e.g. 178"
+      />
+      <NumSetting
+        label="Birth year"
+        value={settings.birthYear}
+        onChange={(v) => save({ birthYear: v })}
+        placeholder="e.g. 1995"
+      />
+      <label className="field">
+        <span>Activity level</span>
+        <select
+          value={settings.activityLevel ?? ''}
+          onChange={(e) => save({ activityLevel: (e.target.value || undefined) as ActivityLevel | undefined })}
+        >
+          <option value="">Choose…</option>
+          {Object.entries(ACTIVITY_LABELS).map(([k, label]) => (
+            <option key={k} value={k}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="field">
+        <span>Goal</span>
+        <select
+          value={settings.goal ?? ''}
+          onChange={(e) => save({ goal: (e.target.value || undefined) as Goal | undefined })}
+        >
+          <option value="">Choose…</option>
+          {Object.entries(GOAL_LABELS).map(([k, label]) => (
+            <option key={k} value={k}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button
+        className="btn-ghost btn-wide"
+        onClick={() => {
+          const t = suggestTargets(settings)
+          if (!t) {
+            setMessage('Fill in bodyweight (above), height, birth year, activity, and goal first.')
+          } else {
+            save({ kcalTarget: t.kcal, proteinTarget: t.protein, carbsTarget: t.carbs, fatTarget: t.fat })
+            setMessage(`Suggested: ${t.kcal} kcal · P ${t.protein}g · C ${t.carbs}g · F ${t.fat}g — tweak below.`)
+          }
+        }}
+      >
+        Calculate suggested targets
+      </button>
+      <p className="muted small">
+        Uses the Mifflin-St Jeor formula with your bodyweight, height, age, activity, and goal. Edit the results
+        freely:
+      </p>
+      <div className="row">
+        <NumSetting label="kcal target" value={settings.kcalTarget} onChange={(v) => save({ kcalTarget: v })} grow />
+        <NumSetting label="Protein g" value={settings.proteinTarget} onChange={(v) => save({ proteinTarget: v })} grow />
+      </div>
+      <div className="row">
+        <NumSetting label="Carbs g" value={settings.carbsTarget} onChange={(v) => save({ carbsTarget: v })} grow />
+        <NumSetting label="Fat g" value={settings.fatTarget} onChange={(v) => save({ fatTarget: v })} grow />
+      </div>
+
       {typeof Notification !== 'undefined' && Notification.permission === 'default' && (
         <button className="btn-ghost btn-wide" onClick={() => Notification.requestPermission()}>
           Enable rest-timer notifications
@@ -126,8 +195,48 @@ export default function SettingsScreen() {
         <a className="text-link" href="https://wger.de" target="_blank" rel="noreferrer">
           wger.de
         </a>{' '}
-        database (CC-BY-SA). Cloud sync across devices isn't built in yet; use Export/Import to move your data.
+        database (CC-BY-SA). Food data from{' '}
+        <a className="text-link" href="https://openfoodfacts.org" target="_blank" rel="noreferrer">
+          Open Food Facts
+        </a>
+        ; recipes from{' '}
+        <a className="text-link" href="https://www.themealdb.com" target="_blank" rel="noreferrer">
+          TheMealDB
+        </a>
+        . Cloud sync across devices isn't built in yet; use Export/Import to move your data.
       </p>
     </>
+  )
+}
+
+function NumSetting({
+  label,
+  value,
+  onChange,
+  placeholder,
+  grow,
+}: {
+  label: string
+  value?: number
+  onChange: (v: number | undefined) => void
+  placeholder?: string
+  grow?: boolean
+}) {
+  const [str, setStr] = useState<string | null>(null)
+  return (
+    <label className={`field ${grow ? 'grow' : ''}`}>
+      <span>{label}</span>
+      <input
+        inputMode="numeric"
+        placeholder={placeholder}
+        value={str ?? (value != null ? String(value) : '')}
+        onChange={(e) => {
+          setStr(e.target.value)
+          const parsed = parseFloat(e.target.value)
+          onChange(Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : undefined)
+        }}
+        onBlur={() => setStr(null)}
+      />
+    </label>
   )
 }

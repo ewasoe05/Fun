@@ -4,6 +4,7 @@ const tabs = [
   { to: '/', icon: '🏋️', label: 'Workout' },
   { to: '/routines', icon: '📋', label: 'Routines' },
   { to: '/exercises', icon: '💪', label: 'Exercises' },
+  { to: '/food', icon: '🍎', label: 'Food' },
   { to: '/progress', icon: '📈', label: 'Progress' },
   { to: '/settings', icon: '⚙️', label: 'Settings' },
 ]
