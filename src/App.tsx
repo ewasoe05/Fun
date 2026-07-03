@@ -7,6 +7,8 @@ import ExercisesScreen from './screens/ExercisesScreen'
 import ExerciseDetailScreen from './screens/ExerciseDetailScreen'
 import ProgressScreen from './screens/ProgressScreen'
 import SettingsScreen from './screens/SettingsScreen'
+import FoodScreen from './screens/FoodScreen'
+import RecipeDetailScreen from './screens/RecipeDetailScreen'
 
 export default function App() {
   return (
@@ -20,6 +22,8 @@ export default function App() {
             <Route path="/exercises" element={<ExercisesScreen />} />
             <Route path="/exercises/:id" element={<ExerciseDetailScreen />} />
             <Route path="/progress" element={<ProgressScreen />} />
+            <Route path="/food" element={<FoodScreen />} />
+            <Route path="/food/recipes/:id" element={<RecipeDetailScreen />} />
             <Route path="/settings" element={<SettingsScreen />} />
           </Routes>
         </main>

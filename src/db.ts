@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie'
-import type { Exercise, Routine, Settings, Workout } from './types'
+import type { Exercise, Food, FoodLog, PlanEntry, Recipe, Routine, Settings, Workout } from './types'
 import { DEFAULT_SETTINGS } from './types'
 import seedExercises from './data/seed-exercises.json'
 
@@ -8,6 +8,10 @@ class LiftLogDB extends Dexie {
   routines!: Table<Routine, string>
   workouts!: Table<Workout, string>
   settings!: Table<Settings, string>
+  foods!: Table<Food, string>
+  foodLogs!: Table<FoodLog, string>
+  recipes!: Table<Recipe, string>
+  planEntries!: Table<PlanEntry, string>
 
   constructor() {
     super('liftlog')
@@ -16,6 +20,12 @@ class LiftLogDB extends Dexie {
       routines: 'id, name, createdAt',
       workouts: 'id, startedAt',
       settings: 'id',
+    })
+    this.version(2).stores({
+      foods: 'id, name, source, offCode, lastUsedAt',
+      foodLogs: 'id, date, meal',
+      recipes: 'id, name, mealdbId, inCookbook',
+      planEntries: 'id, date, [date+meal]',
     })
   }
 }
@@ -44,38 +54,51 @@ export function newId(): string {
 
 interface BackupFile {
   app: 'liftlog'
-  version: 1
+  version: 1 | 2
   exportedAt: string
   exercises: Exercise[]
   routines: Routine[]
   workouts: Workout[]
   settings: Settings[]
+  foods?: Food[]
+  foodLogs?: FoodLog[]
+  recipes?: Recipe[]
+  planEntries?: PlanEntry[]
 }
 
 export async function exportBackup(): Promise<string> {
   const backup: BackupFile = {
     app: 'liftlog',
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     exercises: await db.exercises.toArray(),
     routines: await db.routines.toArray(),
     workouts: await db.workouts.toArray(),
     settings: await db.settings.toArray(),
+    foods: await db.foods.toArray(),
+    foodLogs: await db.foodLogs.toArray(),
+    recipes: await db.recipes.toArray(),
+    planEntries: await db.planEntries.toArray(),
   }
   return JSON.stringify(backup, null, 2)
 }
 
-/** Replaces all local data with the backup's contents. */
+/** Replaces all local data with the backup's contents (v1 backups lack the food tables). */
 export async function importBackup(json: string): Promise<void> {
   const backup = JSON.parse(json) as BackupFile
   if (backup.app !== 'liftlog' || !Array.isArray(backup.workouts)) {
     throw new Error('Not a Lift Log backup file')
   }
-  await db.transaction('rw', db.exercises, db.routines, db.workouts, db.settings, async () => {
-    await Promise.all([db.exercises.clear(), db.routines.clear(), db.workouts.clear(), db.settings.clear()])
+  const tables = [db.exercises, db.routines, db.workouts, db.settings, db.foods, db.foodLogs, db.recipes, db.planEntries]
+  await db.transaction('rw', tables, async () => {
+    await Promise.all(tables.map((t) => t.clear()))
     await db.exercises.bulkAdd(backup.exercises ?? [])
     await db.routines.bulkAdd(backup.routines ?? [])
     await db.workouts.bulkAdd(backup.workouts ?? [])
     await db.settings.bulkAdd(backup.settings ?? [DEFAULT_SETTINGS])
+    await db.foods.bulkAdd(backup.foods ?? [])
+    await db.foodLogs.bulkAdd(backup.foodLogs ?? [])
+    await db.recipes.bulkAdd(backup.recipes ?? [])
+    await db.planEntries.bulkAdd(backup.planEntries ?? [])
   })
 }
