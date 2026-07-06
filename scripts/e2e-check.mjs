@@ -419,6 +419,40 @@ console.log(`coach off: bench prefill ${offPrefill} (expect 165 = last session),
 await page.getByRole('button', { name: 'Discard workout' }).click()
 await page.getByText('Start empty workout').waitFor()
 
+step('profiles: create, isolate, switch back, delete')
+await page.getByRole('link', { name: /Settings/ }).click()
+await page.getByRole('heading', { name: 'Profiles' }).waitFor()
+await page.getByRole('button', { name: '+ Add profile' }).click()
+await page.getByPlaceholder('Name… e.g. Alex').fill('Alex')
+await page.getByRole('button', { name: 'Create', exact: true }).click()
+await page.waitForLoadState('load')
+await page.getByText('Start empty workout').waitFor({ timeout: 15000 })
+await page.getByText(/, Alex$/).waitFor()
+console.log('new profile Alex active, dashboard greeting personalized ✔')
+// isolation: Alex has no workout history…
+const alexHeatmaps = await page.locator('.heatmap').count()
+// …but gets a freshly seeded exercise library
+await page.getByRole('link', { name: /Exercises/ }).click()
+await page.getByPlaceholder('Search exercises…').fill('back squat')
+await page.locator('.list-item', { hasText: 'Back Squat' }).first().waitFor()
+console.log(`Alex: heatmap cards ${alexHeatmaps} (expect 0), seeded library ✔`)
+await shot('17-profiles-fresh')
+// switch back to Me → original data intact
+await page.getByRole('link', { name: /Settings/ }).click()
+await page.locator('.card', { hasText: 'Me' }).getByRole('button', { name: 'Switch' }).click()
+await page.waitForLoadState('load')
+await page.getByText('Start empty workout').waitFor({ timeout: 15000 })
+await page.getByText(/, Me$/).waitFor()
+await page.locator('.heatmap').waitFor()
+console.log('switched back to Me — workout history intact ✔')
+// delete Alex
+await page.getByRole('link', { name: /Settings/ }).click()
+await page.getByRole('button', { name: 'Delete Alex' }).click()
+await page.waitForFunction(() => document.body.textContent.includes('Alex') === false)
+console.log('Alex profile deleted ✔')
+await shot('18-profiles-section')
+await page.locator('.bottom-nav').getByRole('link', { name: 'Workout' }).click()
+
 step('offline check (block network, reload)')
 // route interception makes Chromium bypass service workers — remove it first
 await page.unroute('**wger.de/api/v2/exerciseinfo/**')

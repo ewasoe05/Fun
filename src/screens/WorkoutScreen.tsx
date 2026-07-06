@@ -10,6 +10,7 @@ import { addDays, toDateKey, todayKey, weekStart } from '../lib/nutrition'
 import { epley1RM } from '../lib/oneRepMax'
 import { bestBefore, recentPRs } from '../lib/prs'
 import { analyze } from '../lib/coach'
+import { getActiveProfile } from '../lib/profiles'
 import InsightCard from '../components/InsightCard'
 import SetRow from '../components/SetRow'
 import RestTimer from '../components/RestTimer'
@@ -82,11 +83,24 @@ function Dashboard({ settings }: { settings: Settings }) {
     new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n)
   const delta = thisWeek.workouts - lastWeek.workouts
 
+  const profile = getActiveProfile()
+
   return (
     <>
-      <div className="greeting">{greeting()}</div>
-      <div className="muted small" style={{ marginBottom: 16 }}>
-        {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+      <div className="row-between">
+        <div>
+          <div className="greeting">
+            {greeting()}, {profile.name}
+          </div>
+          <div className="muted small" style={{ marginBottom: 16 }}>
+            {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+          </div>
+        </div>
+        <Link to="/settings" aria-label="Profiles" style={{ textDecoration: 'none' }}>
+          <span className="avatar" style={{ background: profile.color }}>
+            {(profile.name[0] ?? '?').toUpperCase()}
+          </span>
+        </Link>
       </div>
 
       <button className="btn-primary btn-wide" style={{ minHeight: 52 }} onClick={() => startWorkout()}>

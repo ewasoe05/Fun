@@ -3,6 +3,14 @@ import { db, exportBackup, importBackup } from '../db'
 import { useSettings } from '../hooks/useSettings'
 import { cmToFtIn, formatWeight, ftInToCm, toKg } from '../lib/units'
 import { ACTIVITY_LABELS, GOAL_LABELS, suggestTargets } from '../lib/nutrition'
+import {
+  createProfile,
+  deleteProfile,
+  getActiveProfile,
+  loadProfiles,
+  renameProfile,
+  switchProfile,
+} from '../lib/profiles'
 import type { ActivityLevel, Goal, Settings } from '../types'
 
 export default function SettingsScreen() {
@@ -43,6 +51,8 @@ export default function SettingsScreen() {
   return (
     <>
       <h1>Settings</h1>
+
+      <ProfilesSection />
 
       <label className="field">
         <span>Units</span>
@@ -180,8 +190,8 @@ export default function SettingsScreen() {
 
       <h2>Backup</h2>
       <p className="muted small">
-        Your data lives only on this device. Export a backup file now and then — you can restore it here or move it to
-        a new phone.
+        Your data lives only on this device, and backups cover the <strong className="ink2">current profile</strong>{' '}
+        only. Export a backup file now and then — you can restore it here or move it to a new phone.
       </p>
       <div className="row">
         <button className="btn-primary grow" onClick={doExport}>
@@ -307,5 +317,102 @@ function HeightImperial({
         />
       </label>
     </div>
+  )
+}
+
+function ProfilesSection() {
+  const [profiles, setProfiles] = useState(loadProfiles)
+  const active = getActiveProfile()
+  const [nameStr, setNameStr] = useState<string | null>(null)
+  const [newName, setNewName] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [switching, setSwitching] = useState(false)
+
+  function rename(value: string) {
+    setNameStr(value)
+    renameProfile(active.id, value)
+    setProfiles(loadProfiles())
+  }
+
+  async function removeProfile(id: string, name: string) {
+    if (!confirm(`Delete profile “${name}”? All of their workouts, food logs, and settings are erased permanently.`)) return
+    await deleteProfile(id)
+    setProfiles(loadProfiles())
+  }
+
+  return (
+    <>
+      <h2 style={{ marginTop: 4 }}>Profiles</h2>
+      {switching && <p className="ink2 small">Switching…</p>}
+      {profiles.map((p) => (
+        <div className="card row" key={p.id} style={{ padding: '10px 14px' }}>
+          <span className="avatar" style={{ background: p.color }}>
+            {(p.name[0] ?? '?').toUpperCase()}
+          </span>
+          {p.id === active.id ? (
+            <input
+              className="grow"
+              value={nameStr ?? p.name}
+              onChange={(e) => rename(e.target.value)}
+              onBlur={() => setNameStr(null)}
+              aria-label="Profile name"
+            />
+          ) : (
+            <span className="grow">{p.name}</span>
+          )}
+          {p.id === active.id ? (
+            <span className="small" style={{ color: 'var(--accent)', fontWeight: 600 }}>
+              Active
+            </span>
+          ) : (
+            <>
+              <button
+                className="btn-ghost"
+                onClick={() => {
+                  setSwitching(true)
+                  switchProfile(p.id)
+                }}
+              >
+                Switch
+              </button>
+              {profiles.length > 1 && (
+                <button className="btn-icon btn-ghost" onClick={() => removeProfile(p.id, p.name)} aria-label={`Delete ${p.name}`}>
+                  ✕
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      ))}
+      {adding ? (
+        <div className="row">
+          <input
+            autoFocus
+            className="grow"
+            placeholder="Name… e.g. Alex"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && newName.trim() && createProfile(newName)}
+          />
+          <button
+            className="btn-primary"
+            disabled={!newName.trim()}
+            onClick={() => {
+              setSwitching(true)
+              createProfile(newName)
+            }}
+          >
+            Create
+          </button>
+        </div>
+      ) : (
+        <button className="btn-ghost btn-wide" onClick={() => setAdding(true)}>
+          + Add profile
+        </button>
+      )}
+      <p className="muted small">
+        Each profile keeps completely separate workouts, nutrition, recipes, and settings on this device.
+      </p>
+    </>
   )
 }
