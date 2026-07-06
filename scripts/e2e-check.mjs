@@ -60,7 +60,7 @@ if (foodFixtures) {
 
 step('load app')
 await page.goto(BASE)
-await page.getByText('Start a workout').waitFor({ timeout: 15000 })
+await page.getByText('Start empty workout').waitFor({ timeout: 15000 })
 
 step('inject demo history into IndexedDB')
 await page.evaluate(async () => {
@@ -71,7 +71,25 @@ await page.evaluate(async () => {
       req.onerror = () => rej(req.error)
     })
   const idb = await open()
-  const tx = idb.transaction(['workouts', 'settings'], 'readwrite')
+  const tx = idb.transaction(['workouts', 'settings', 'foodLogs'], 'readwrite')
+  const foodLogs = tx.objectStore('foodLogs')
+  // a week of prior calorie history so the 14-day chart renders
+  for (let i = 1; i <= 7; i++) {
+    const d = new Date(Date.now() - i * 24 * 3600 * 1000)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    foodLogs.put({
+      id: `demo-food-${i}`,
+      date: key,
+      meal: 'dinner',
+      name: 'Demo meal',
+      grams: 500,
+      kcal: 1800 + (i % 4) * 220,
+      protein: 120,
+      carbs: 180,
+      fat: 60,
+      loggedAt: d.getTime(),
+    })
+  }
   const workouts = tx.objectStore('workouts')
   const week = 7 * 24 * 3600 * 1000
   const now = Date.now()
@@ -102,7 +120,14 @@ await page.evaluate(async () => {
   idb.close()
 })
 await page.reload()
-await page.getByText('Start a workout').waitFor()
+await page.getByText('Start empty workout').waitFor()
+
+step('dashboard')
+await page.getByText(/Good (morning|afternoon|evening)|Night session/).waitFor()
+await page.locator('.heatmap').waitFor()
+const statValues = await page.locator('.stat-row .value').allTextContents()
+console.log('this-week stats (workouts/sets/volume):', statValues)
+await shot('0-dashboard')
 
 step('create a routine')
 await page.getByRole('link', { name: /Routines/ }).click()
@@ -140,8 +165,19 @@ await firstRow.locator('input').nth(1).fill('8')
 await firstRow.locator('.set-done-btn').click()
 await page.locator('.rest-timer').waitFor()
 await shot('2-rest-timer')
-console.log('rest timer text:', (await page.locator('.rest-time').textContent()).trim())
+console.log('rest timer text:', (await page.locator('.rest-timer .ring-center').textContent()).trim())
+// 165 lb × 8 beats the demo history's best bench (est. 1RM) → PR trophy + confetti
+await page.locator('.set-grid .pr-flash').first().waitFor({ timeout: 5000 })
+console.log('PR trophy shown on the set ✔')
 await page.getByRole('button', { name: 'Skip' }).click()
+
+step('plate calculator')
+await page.locator('.card').first().getByRole('button', { name: 'Plate calculator' }).click()
+await page.getByText('Per side:').waitFor()
+const plates = await page.locator('.modal .card .row-between').allTextContents()
+console.log('plates for 165 lb:', plates.map((p) => p.replace(/\s+/g, ' ').trim()))
+await shot('2b-plate-calculator')
+await page.getByRole('button', { name: 'Close' }).click()
 // check off every remaining set
 const buttons = page.locator('.set-done-btn:not(.done)')
 while ((await buttons.count()) > 0) {
@@ -153,12 +189,12 @@ console.log('all sets checked')
 
 step('finish workout')
 await page.getByRole('button', { name: 'Finish' }).click()
-await page.getByText('Start a workout').waitFor()
+await page.getByText('Start empty workout').waitFor()
 console.log('workout saved, back on start screen')
 
 step('progress screen')
 await page.getByRole('link', { name: /Progress/ }).click()
-await page.getByText('Strength standards').waitFor()
+await page.getByRole('heading', { name: 'Strength standards' }).waitFor()
 await page.locator('.recharts-surface').first().waitFor()
 console.log('selected exercise:', await page.locator('select').inputValue())
 await shot('4-progress-1rm')
@@ -168,6 +204,15 @@ await shot('5-progress-volume')
 const meters = await page.locator('.meter').count()
 const standards = await page.locator('.card', { hasText: 'est. 1RM reaches' }).first().textContent()
 console.log(`standards meters: ${meters}, first card:`, standards.replace(/\s+/g, ' ').slice(0, 120))
+
+step('bodyweight log')
+await page.getByRole('button', { name: 'Log weight' }).click()
+const bwInput = page.locator('label:has-text("Today\'s weight") input')
+console.log('bodyweight prefill (lb):', await bwInput.inputValue())
+await bwInput.fill('181')
+await page.getByRole('button', { name: 'Save', exact: true }).click()
+await page.locator('.card', { hasText: 'Log weight' }).getByText('181 lb').waitFor()
+console.log('bodyweight logged ✔')
 
 step('exercise detail')
 await page.getByRole('link', { name: /Exercises/ }).click()
@@ -228,19 +273,22 @@ if (foodFixtures) {
 
   step('diary: quick add')
   await page.locator('.card', { hasText: 'Lunch' }).getByRole('button', { name: '+ Add food' }).click()
-  await page.getByRole('button', { name: '⚡ Quick add' }).click()
+  await page.getByRole('button', { name: 'Quick add', exact: true }).click()
   await page.locator('label:has-text("Calories (kcal)") input').fill('350')
   await page.locator('label:has-text("Protein (g)") input').fill('30')
   await page.getByRole('button', { name: 'Add to diary' }).click()
 
   step('diary: barcode manual lookup')
   await page.locator('.card', { hasText: 'Dinner' }).getByRole('button', { name: '+ Add food' }).click()
-  await page.getByRole('button', { name: '📷 Scan' }).click()
+  await page.getByRole('button', { name: 'Scan', exact: true }).click()
   await page.getByPlaceholder('e.g. 0894700010137').fill('0894700010137')
   await page.getByRole('button', { name: 'Look up' }).click()
   await page.getByText('Greek Yogurt Nonfat Plain').first().waitFor()
   await page.getByRole('button', { name: '1 serving' }).click()
   await page.getByRole('button', { name: 'Add to diary' }).click()
+  await page.locator('.ring-wrap').first().waitFor()
+  await page.getByText(/Last 14 days \(kcal\)/).waitFor()
+  console.log('calorie ring + 14-day history chart render ✔')
   await shot('11-food-diary')
 
   step('recipes: search, save, add to plan')
@@ -252,10 +300,10 @@ if (foodFixtures) {
   await page.locator('.recipe-card').first().click()
   await page.getByRole('heading', { name: 'Ingredients' }).waitFor()
   await shot('13-recipe-detail')
-  await page.getByRole('button', { name: '☆ Save to cookbook' }).click()
-  await page.getByRole('button', { name: '★ Saved — remove' }).waitFor()
-  await page.getByRole('button', { name: '📅 Add to plan' }).click()
-  await page.getByRole('button', { name: 'Add to plan', exact: true }).click()
+  await page.getByRole('button', { name: 'Save to cookbook' }).click()
+  await page.getByRole('button', { name: 'Saved — remove' }).waitFor()
+  await page.getByRole('button', { name: 'Add to plan' }).click()
+  await page.getByRole('button', { name: 'Confirm', exact: true }).click()
   await page.getByText('Added to your meal plan ✔').waitFor()
 
   step('meal plan week view')
@@ -291,7 +339,7 @@ step('offline check (block network, reload)')
 await page.unroute('**wger.de/api/v2/exerciseinfo/**')
 await page.goto(BASE)
 try {
-  await page.getByText('Start a workout').waitFor({ timeout: 15000 })
+  await page.getByText('Start empty workout').waitFor({ timeout: 15000 })
 } catch {
   console.log('DEBUG url:', page.url())
   console.log('DEBUG body:', (await page.textContent('body').catch(() => 'N/A'))?.slice(0, 300))
@@ -310,7 +358,7 @@ await page.evaluate(async () => {
 })
 await ctx.setOffline(true)
 await page.reload()
-await page.getByText('Start a workout').waitFor({ timeout: 15000 })
+await page.getByText('Start empty workout').waitFor({ timeout: 15000 })
 console.log('app shell loads offline ✔')
 await ctx.setOffline(false)
 

@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useNavigate } from 'react-router-dom'
 import { db, newId } from '../db'
 import type { Routine } from '../types'
+import { IconClipboard } from '../components/icons'
 
 export default function RoutinesScreen() {
   const navigate = useNavigate()
@@ -24,7 +25,9 @@ export default function RoutinesScreen() {
       <div style={{ marginTop: 16 }}>
         {routines.length === 0 && (
           <div className="empty">
-            <div className="big">📋</div>
+            <div style={{ color: 'var(--muted)', marginBottom: 8 }}>
+              <IconClipboard size={36} />
+            </div>
             Routines pre-load your workout with exercises and target sets — like Push, Pull, Legs.
           </div>
         )}

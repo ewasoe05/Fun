@@ -7,6 +7,7 @@ import { MEAL_SLOTS } from '../types'
 import { useSettings } from '../hooks/useSettings'
 import { addDays, formatDateKey, sumMacros, todayKey } from '../lib/nutrition'
 import MacroSummary from '../components/MacroSummary'
+import CalorieHistory from '../components/CalorieHistory'
 import FoodPicker, { type PendingLog } from '../components/FoodPicker'
 import RecipesTab from './RecipesTab'
 import PlanTab from './PlanTab'
@@ -153,6 +154,8 @@ function DiaryTab() {
           </div>
         )
       })}
+
+      <CalorieHistory target={settings.kcalTarget} />
 
       {pickerMeal && <FoodPicker onAdd={addEntry} onClose={() => setPickerMeal(null)} />}
     </>

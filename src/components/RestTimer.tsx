@@ -66,28 +66,41 @@ export default function RestTimer({ endsAt, totalSeconds, onExtend, onClose }: P
   const mins = Math.floor(remaining / 60)
   const secs = remaining % 60
   const frac = totalSeconds > 0 ? Math.max(0, Math.min(1, remaining / totalSeconds)) : 0
+  const size = 64
+  const strokeW = 6
+  const r = (size - strokeW) / 2
+  const c = 2 * Math.PI * r
 
   return (
-    <div className="rest-timer">
-      <div className="row-between">
-        <div>
-          <div className="muted small">{remaining > 0 ? 'Rest' : 'Rest over — go!'}</div>
-          <div className="rest-time">
+    <div className="rest-timer row" style={{ gap: 14 }}>
+      <div className="ring-wrap" style={{ width: size, height: size, flexShrink: 0 }}>
+        <svg width={size} height={size}>
+          <circle className="ring-track" cx={size / 2} cy={size / 2} r={r} strokeWidth={strokeW} />
+          <circle
+            className="ring-fill"
+            cx={size / 2}
+            cy={size / 2}
+            r={r}
+            strokeWidth={strokeW}
+            strokeLinecap="round"
+            strokeDasharray={c}
+            strokeDashoffset={c * (1 - frac)}
+            style={{ transition: 'stroke-dashoffset 0.25s linear' }}
+          />
+        </svg>
+        <div className="ring-center">
+          <span style={{ fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
             {mins}:{String(secs).padStart(2, '0')}
-          </div>
-        </div>
-        <div className="row">
-          <button className="btn-ghost" onClick={() => onExtend(30)}>
-            +30s
-          </button>
-          <button className="btn-ghost" onClick={onClose}>
-            Skip
-          </button>
+          </span>
         </div>
       </div>
-      <div className="rest-bar">
-        <div className="rest-bar-fill" style={{ width: `${frac * 100}%` }} />
-      </div>
+      <div className="grow ink2 small">{remaining > 0 ? 'Rest' : 'Rest over — go! 💪'}</div>
+      <button className="btn-ghost" onClick={() => onExtend(30)}>
+        +30s
+      </button>
+      <button className="btn-ghost" onClick={onClose}>
+        Skip
+      </button>
     </div>
   )
 }

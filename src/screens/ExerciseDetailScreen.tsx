@@ -7,6 +7,7 @@ import { sessionStats } from '../lib/oneRepMax'
 import { formatWeightWithUnit, formatWeight, fromKg } from '../lib/units'
 import { youtubeFormSearchUrl } from '../api/wger'
 import ProgressChart from '../components/ProgressChart'
+import { IconPlay } from '../components/icons'
 
 export default function ExerciseDetailScreen() {
   const { id } = useParams()
@@ -54,7 +55,9 @@ export default function ExerciseDetailScreen() {
 
       {exercise.videoUrl && (
         <a className="list-item" href={exercise.videoUrl} target="_blank" rel="noreferrer">
-          <span style={{ fontSize: 22 }}>🎬</span>
+          <span style={{ color: 'var(--accent)' }}>
+            <IconPlay size={22} />
+          </span>
           <div className="grow">
             <div>Watch demo video</div>
             <div className="muted">From the wger.de exercise database</div>
@@ -67,7 +70,9 @@ export default function ExerciseDetailScreen() {
         target="_blank"
         rel="noreferrer"
       >
-        <span style={{ fontSize: 22 }}>▶️</span>
+        <span style={{ color: 'var(--accent)' }}>
+          <IconPlay size={22} />
+        </span>
         <div className="grow">
           <div>Watch form videos</div>
           <div className="muted">Opens a YouTube search for “{exercise.name} proper form”</div>

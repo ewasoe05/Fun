@@ -141,6 +141,13 @@ export interface Recipe {
   savedAt: number
 }
 
+export interface BodyLog {
+  id: string
+  date: string // YYYY-MM-DD
+  weightKg: number
+  loggedAt: number
+}
+
 export interface PlanEntry {
   id: string
   date: string // YYYY-MM-DD

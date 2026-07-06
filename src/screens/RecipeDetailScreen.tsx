@@ -5,6 +5,7 @@ import { db, newId } from '../db'
 import type { PlanMeal } from '../types'
 import { PLAN_MEALS } from '../types'
 import { addDays, formatDateKey, todayKey } from '../lib/nutrition'
+import { IconCalendar, IconPlay, IconStar } from '../components/icons'
 
 export default function RecipeDetailScreen() {
   const { id } = useParams()
@@ -45,13 +46,13 @@ export default function RecipeDetailScreen() {
 
       <div className="row" style={{ marginBottom: 12 }}>
         <button
-          className={saved ? 'btn-ghost grow' : 'btn-primary grow'}
+          className={`btn-flex grow ${saved ? 'btn-ghost' : 'btn-primary'}`}
           onClick={() => db.recipes.update(recipe.id, { inCookbook: saved ? 0 : 1, savedAt: Date.now() })}
         >
-          {saved ? '★ Saved — remove' : '☆ Save to cookbook'}
+          <IconStar size={17} filled={saved} /> {saved ? 'Saved — remove' : 'Save to cookbook'}
         </button>
-        <button className="btn-ghost grow" onClick={() => setPlanOpen(!planOpen)}>
-          📅 Add to plan
+        <button className="btn-ghost btn-flex grow" onClick={() => setPlanOpen(!planOpen)}>
+          <IconCalendar size={17} /> Add to plan
         </button>
       </div>
       {added && !planOpen && <p className="small" style={{ color: 'var(--good)' }}>Added to your meal plan ✔</p>}
@@ -79,7 +80,7 @@ export default function RecipeDetailScreen() {
             </select>
           </label>
           <button className="btn-primary btn-wide" onClick={addToPlan}>
-            Add to plan
+            Confirm
           </button>
         </div>
       )}
@@ -107,7 +108,9 @@ export default function RecipeDetailScreen() {
 
       {recipe.videoUrl && (
         <a className="list-item" href={recipe.videoUrl} target="_blank" rel="noreferrer">
-          <span style={{ fontSize: 22 }}>▶️</span>
+          <span style={{ color: 'var(--accent)' }}>
+            <IconPlay size={22} />
+          </span>
           <div className="grow">
             <div>Watch video</div>
             <div className="muted">Cooking video on YouTube</div>

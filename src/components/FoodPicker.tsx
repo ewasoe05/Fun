@@ -5,6 +5,7 @@ import type { Food, MacroSet } from '../types'
 import { foodByBarcode, searchFoods, type FoodDraft } from '../api/openFoodFacts'
 import { scalePer100g } from '../lib/nutrition'
 import BarcodeScanner from './BarcodeScanner'
+import { IconBolt, IconCamera, IconPlus, IconStar } from './icons'
 
 /** A diary entry draft — the caller adds id/date/meal/loggedAt. */
 export interface PendingLog extends MacroSet {
@@ -113,14 +114,14 @@ export default function FoodPicker({ onAdd, onClose }: Props) {
           {view.kind === 'browse' && (
             <>
               <div className="row" style={{ marginBottom: 10 }}>
-                <button className="btn-ghost grow" onClick={() => setView({ kind: 'scan' })}>
-                  📷 Scan
+                <button className="btn-ghost btn-flex grow" onClick={() => setView({ kind: 'scan' })}>
+                  <IconCamera size={17} /> Scan
                 </button>
-                <button className="btn-ghost grow" onClick={() => setView({ kind: 'quick' })}>
-                  ⚡ Quick add
+                <button className="btn-ghost btn-flex grow" onClick={() => setView({ kind: 'quick' })}>
+                  <IconBolt size={17} /> Quick add
                 </button>
-                <button className="btn-ghost grow" onClick={() => setView({ kind: 'custom' })}>
-                  + New food
+                <button className="btn-ghost btn-flex grow" onClick={() => setView({ kind: 'custom' })}>
+                  <IconPlus size={17} /> New food
                 </button>
               </div>
               <input
@@ -215,8 +216,13 @@ function PortionStep({ food, onAdd }: { food: Food; onAdd: (entry: PendingLog) =
             {[food.brand, `${food.per100g.kcal} kcal / 100g`].filter(Boolean).join(' · ')}
           </div>
         </div>
-        <button className="btn-icon btn-ghost" onClick={() => setFav(!fav)} aria-label="Favorite">
-          {fav ? '★' : '☆'}
+        <button
+          className="btn-icon btn-ghost"
+          onClick={() => setFav(!fav)}
+          aria-label="Favorite"
+          style={fav ? { color: '#eda100' } : undefined}
+        >
+          <IconStar size={18} filled={fav} />
         </button>
       </div>
       <label className="field">

@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, newId } from '../db'
 import type { Recipe } from '../types'
 import { randomMeal, searchMeals, type MealDraft } from '../api/mealdb'
+import { IconDice } from '../components/icons'
 
 /** Upsert a TheMealDB draft locally (not yet in the cookbook) and return its id. */
 async function draftToRecipe(d: MealDraft): Promise<string> {
@@ -76,8 +77,8 @@ export default function RecipesTab() {
           Search
         </button>
       </div>
-      <button className="btn-ghost btn-wide" disabled={busy} onClick={surprise}>
-        🎲 Surprise me with a random recipe
+      <button className="btn-ghost btn-flex btn-wide" disabled={busy} onClick={surprise}>
+        <IconDice size={17} /> Surprise me with a random recipe
       </button>
       {error && <p className="small" style={{ color: 'var(--danger)' }}>{error}</p>}
       {busy && <p className="muted small">Searching TheMealDB…</p>}
