@@ -19,3 +19,14 @@ export function formatWeight(kg: number, units: Units): string {
 export function formatWeightWithUnit(kg: number, units: Units): string {
   return `${formatWeight(kg, units)} ${units}`
 }
+
+export const CM_PER_IN = 2.54
+
+export function cmToFtIn(cm: number): { ft: number; inches: number } {
+  const totalIn = Math.round(cm / CM_PER_IN)
+  return { ft: Math.floor(totalIn / 12), inches: totalIn % 12 }
+}
+
+export function ftInToCm(ft: number, inches: number): number {
+  return Math.round((ft * 12 + inches) * CM_PER_IN * 10) / 10
+}

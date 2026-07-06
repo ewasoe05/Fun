@@ -54,6 +54,13 @@ if (foodFixtures) {
       const first = JSON.parse(json('fix-mealdb-search.json')).meals[0]
       return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ meals: [first] }) })
     }
+    if (url.includes('filter.php')) {
+      const fixture = url.includes('c=Breakfast') ? 'fix-mealdb-breakfast.json' : 'fix-mealdb-chicken.json'
+      return route.fulfill({ contentType: 'application/json', body: json(fixture) })
+    }
+    if (url.includes('lookup.php')) {
+      return route.fulfill({ contentType: 'application/json', body: json('fix-mealdb-lookup.json') })
+    }
     return route.fulfill({ contentType: 'application/json', body: json('fix-mealdb-search.json') })
   })
 }
@@ -290,7 +297,9 @@ if (foodFixtures) {
   step('nutrition settings + TDEE calculator')
   await page.getByRole('link', { name: /Settings/ }).click()
   await page.getByRole('heading', { name: 'Nutrition' }).waitFor()
-  await page.locator('label:has-text("Height (cm)") input').fill('180')
+  // lb users enter height as feet + inches (stored as cm internally)
+  await page.locator('label:has-text("Height (ft)") input').fill('5')
+  await page.locator('label:has-text("Height (in)") input').fill('11')
   await page.locator('label:has-text("Birth year") input').fill('1998')
   await page.locator('label:has-text("Activity level") select').selectOption('moderate')
   await page.locator('label:has-text("Goal") select').selectOption('cut')
@@ -358,6 +367,25 @@ if (foodFixtures) {
   await page.getByText('Katsu Chicken curry').first().waitFor()
   console.log('plan shows the saved recipe on today ✔')
   await shot('14-meal-plan')
+
+  step('fill week with meals (optional generator)')
+  await page.getByRole('button', { name: '✨ Fill week with meals' }).click()
+  await page.getByText(/Filled \d+ meals/).waitFor({ timeout: 15000 })
+  const filledSlots = await page.locator('[aria-label="Remove"]').count()
+  console.log(`filled slots after generator (expect 21): ${filledSlots}`)
+  await shot('16-plan-filled')
+  // generated entries are stubs — opening one lazily fetches full details
+  const mondayBreakfast = page.locator('.card').first().locator('.row', { hasText: 'Breakfast' }).locator('button').first()
+  await mondayBreakfast.click()
+  await page.getByRole('heading', { name: 'Instructions' }).waitFor({ timeout: 15000 })
+  console.log('stub recipe lazily enriched with full details ✔')
+  await page.getByRole('button', { name: '‹ Back' }).click()
+  await page.getByRole('button', { name: 'Plan', exact: true }).click()
+
+  step('clear week')
+  await page.getByRole('button', { name: 'Clear', exact: true }).click()
+  await page.waitForFunction(() => document.querySelectorAll('[aria-label="Remove"]').length === 0)
+  console.log('week cleared ✔')
 }
 
 step('settings + export')

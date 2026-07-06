@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, newId } from '../db'
 import type { PlanMeal } from '../types'
 import { PLAN_MEALS } from '../types'
+import { lookupMeal } from '../api/mealdb'
 import { addDays, formatDateKey, todayKey } from '../lib/nutrition'
 import { IconCalendar, IconPlay, IconStar } from '../components/icons'
 
@@ -15,6 +16,35 @@ export default function RecipeDetailScreen() {
   const [planDate, setPlanDate] = useState(todayKey())
   const [planMeal, setPlanMeal] = useState<PlanMeal>('dinner')
   const [added, setAdded] = useState(false)
+  const [detailError, setDetailError] = useState(false)
+
+  // auto-filled plan entries are saved as stubs — fetch full details on first open
+  const needsDetails = !!recipe && recipe.source === 'mealdb' && !recipe.instructions && !!recipe.mealdbId
+  useEffect(() => {
+    if (!needsDetails || !recipe) return
+    let cancelled = false
+    lookupMeal(recipe.mealdbId!)
+      .then((full) => {
+        if (cancelled || !full) return
+        db.recipes.update(recipe.id, {
+          name: full.name,
+          category: full.category || recipe.category,
+          area: full.area,
+          instructions: full.instructions,
+          imageUrl: full.imageUrl ?? recipe.imageUrl,
+          videoUrl: full.videoUrl,
+          sourceUrl: full.sourceUrl,
+          ingredients: full.ingredients,
+        })
+      })
+      .catch(() => {
+        if (!cancelled) setDetailError(true)
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needsDetails, recipe?.id])
 
   if (!recipe) return null
   const saved = recipe.inCookbook === 1
@@ -83,6 +113,11 @@ export default function RecipeDetailScreen() {
             Confirm
           </button>
         </div>
+      )}
+
+      {needsDetails && !detailError && <p className="muted small">Loading recipe details…</p>}
+      {needsDetails && detailError && (
+        <p className="muted small">Couldn't load the full recipe — check your connection and reopen this page.</p>
       )}
 
       {recipe.ingredients.length > 0 && (

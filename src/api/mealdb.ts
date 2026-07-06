@@ -51,3 +51,27 @@ export async function randomMeal(): Promise<MealDraft | null> {
   const json = await res.json()
   return parseMeal(json.meals?.[0])
 }
+
+export interface MealStub {
+  mealdbId: string
+  name: string
+  imageUrl?: string
+}
+
+/** Lightweight id/name/thumb list for a TheMealDB category (e.g. "Breakfast"). */
+export async function listCategory(category: string): Promise<MealStub[]> {
+  const res = await fetch(`${BASE}/filter.php?c=${encodeURIComponent(category)}`)
+  if (!res.ok) throw new Error(`category list failed (${res.status})`)
+  const json = await res.json()
+  return ((json.meals ?? []) as any[])
+    .filter((m) => m?.idMeal && m?.strMeal)
+    .map((m) => ({ mealdbId: String(m.idMeal), name: m.strMeal, imageUrl: m.strMealThumb || undefined }))
+}
+
+/** Full recipe details by TheMealDB id. */
+export async function lookupMeal(mealdbId: string): Promise<MealDraft | null> {
+  const res = await fetch(`${BASE}/lookup.php?i=${encodeURIComponent(mealdbId)}`)
+  if (!res.ok) throw new Error(`recipe lookup failed (${res.status})`)
+  const json = await res.json()
+  return parseMeal(json.meals?.[0])
+}
