@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { db, exportBackup, importBackup } from '../db'
 import { useSettings } from '../hooks/useSettings'
-import { formatWeight, toKg } from '../lib/units'
+import { cmToFtIn, formatWeight, ftInToCm, toKg } from '../lib/units'
 import { ACTIVITY_LABELS, GOAL_LABELS, suggestTargets } from '../lib/nutrition'
 import type { ActivityLevel, Goal, Settings } from '../types'
 
@@ -101,12 +101,16 @@ export default function SettingsScreen() {
       </label>
 
       <h2>Nutrition</h2>
-      <NumSetting
-        label="Height (cm)"
-        value={settings.heightCm}
-        onChange={(v) => save({ heightCm: v })}
-        placeholder="e.g. 178"
-      />
+      {settings.units === 'lb' ? (
+        <HeightImperial heightCm={settings.heightCm} onChange={(cm) => save({ heightCm: cm })} />
+      ) : (
+        <NumSetting
+          label="Height (cm)"
+          value={settings.heightCm}
+          onChange={(v) => save({ heightCm: v })}
+          placeholder="e.g. 178"
+        />
+      )}
       <NumSetting
         label="Birth year"
         value={settings.birthYear}
@@ -249,5 +253,59 @@ function NumSetting({
         onBlur={() => setStr(null)}
       />
     </label>
+  )
+}
+
+function HeightImperial({
+  heightCm,
+  onChange,
+}: {
+  heightCm?: number
+  onChange: (cm: number | undefined) => void
+}) {
+  const derived = heightCm ? cmToFtIn(heightCm) : null
+  const [ftStr, setFtStr] = useState<string | null>(null)
+  const [inStr, setInStr] = useState<string | null>(null)
+
+  function commit(ftS: string, inS: string) {
+    const ft = parseInt(ftS, 10)
+    const inches = inS.trim() === '' ? 0 : parseInt(inS, 10)
+    if (Number.isFinite(ft) && ft > 0 && Number.isFinite(inches) && inches >= 0 && inches < 12) {
+      onChange(ftInToCm(ft, inches))
+    }
+  }
+
+  const ftShown = ftStr ?? (derived ? String(derived.ft) : '')
+  const inShown = inStr ?? (derived ? String(derived.inches) : '')
+
+  return (
+    <div className="row">
+      <label className="field grow">
+        <span>Height (ft)</span>
+        <input
+          inputMode="numeric"
+          placeholder="5"
+          value={ftShown}
+          onChange={(e) => {
+            setFtStr(e.target.value)
+            commit(e.target.value, inShown)
+          }}
+          onBlur={() => setFtStr(null)}
+        />
+      </label>
+      <label className="field grow">
+        <span>Height (in)</span>
+        <input
+          inputMode="numeric"
+          placeholder="11"
+          value={inShown}
+          onChange={(e) => {
+            setInStr(e.target.value)
+            commit(ftShown, e.target.value)
+          }}
+          onBlur={() => setInStr(null)}
+        />
+      </label>
+    </div>
   )
 }

@@ -5,6 +5,7 @@ import { db, newId } from '../db'
 import type { PlanMeal } from '../types'
 import { PLAN_MEALS } from '../types'
 import { addDays, formatDateKey, todayKey, weekStart } from '../lib/nutrition'
+import { clearWeek, fillWeek } from '../lib/mealPlanner'
 
 const MEAL_LABELS: Record<PlanMeal, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner' }
 
@@ -12,6 +13,31 @@ export default function PlanTab() {
   const navigate = useNavigate()
   const [start, setStart] = useState(weekStart(todayKey()))
   const [slot, setSlot] = useState<{ date: string; meal: PlanMeal } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+
+  async function autoFill() {
+    setBusy(true)
+    setMessage('')
+    try {
+      const result = await fillWeek(start)
+      setMessage(
+        result.filled === 0
+          ? 'The week is already full.'
+          : `Filled ${result.filled} meal${result.filled === 1 ? '' : 's'}${result.offlineFallback ? ' from your cookbook (offline)' : ''} — tap any meal to swap or remove it.`,
+      )
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : 'Could not fill the week.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function clear() {
+    if (!confirm('Remove all planned meals for this week?')) return
+    await clearWeek(start)
+    setMessage('')
+  }
 
   const end = addDays(start, 6)
   const entries =
@@ -34,6 +60,16 @@ export default function PlanTab() {
           ›
         </button>
       </div>
+
+      <div className="row" style={{ marginBottom: 12 }}>
+        <button className="btn-primary grow" disabled={busy} onClick={autoFill}>
+          {busy ? 'Filling…' : '✨ Fill week with meals'}
+        </button>
+        <button className="btn-ghost" disabled={busy || entries.length === 0} onClick={clear}>
+          Clear
+        </button>
+      </div>
+      {message && <p className="ink2 small" style={{ marginTop: -4 }}>{message}</p>}
 
       {days.map((date) => (
         <div className="card" key={date} style={date === today ? { borderColor: 'var(--accent)' } : undefined}>
