@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import type { SetLog, Units } from '../types'
 import { formatWeight, toKg } from '../lib/units'
+import { IconTrophy } from './icons'
 
 interface Props {
   index: number
   set: SetLog
   prevHint?: string
   units: Units
+  pr?: boolean
   onChange: (set: SetLog) => void
 }
 
-export default function SetRow({ index, set, prevHint, units, onChange }: Props) {
+export default function SetRow({ index, set, prevHint, units, pr, onChange }: Props) {
   const [weightStr, setWeightStr] = useState(set.weightKg > 0 ? formatWeight(set.weightKg, units) : '')
   const [repsStr, setRepsStr] = useState(set.reps > 0 ? String(set.reps) : '')
 
@@ -32,7 +34,15 @@ export default function SetRow({ index, set, prevHint, units, onChange }: Props)
 
   return (
     <div className={`set-grid ${set.done ? 'set-row-done' : ''}`}>
-      <div className="set-num">{index + 1}</div>
+      <div className="set-num">
+        {pr ? (
+          <span className="pr-flash" title="New PR!">
+            <IconTrophy size={16} />
+          </span>
+        ) : (
+          index + 1
+        )}
+      </div>
       <div className="prev-hint">{prevHint ?? '—'}</div>
       <input inputMode="decimal" placeholder="0" value={weightStr} onChange={(e) => changeWeight(e.target.value)} />
       <input inputMode="numeric" placeholder="0" value={repsStr} onChange={(e) => changeReps(e.target.value)} />

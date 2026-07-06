@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie'
-import type { Exercise, Food, FoodLog, PlanEntry, Recipe, Routine, Settings, Workout } from './types'
+import type { BodyLog, Exercise, Food, FoodLog, PlanEntry, Recipe, Routine, Settings, Workout } from './types'
 import { DEFAULT_SETTINGS } from './types'
 import seedExercises from './data/seed-exercises.json'
 
@@ -12,6 +12,7 @@ class LiftLogDB extends Dexie {
   foodLogs!: Table<FoodLog, string>
   recipes!: Table<Recipe, string>
   planEntries!: Table<PlanEntry, string>
+  bodyLogs!: Table<BodyLog, string>
 
   constructor() {
     super('liftlog')
@@ -26,6 +27,9 @@ class LiftLogDB extends Dexie {
       foodLogs: 'id, date, meal',
       recipes: 'id, name, mealdbId, inCookbook',
       planEntries: 'id, date, [date+meal]',
+    })
+    this.version(3).stores({
+      bodyLogs: 'id, date',
     })
   }
 }
@@ -64,6 +68,7 @@ interface BackupFile {
   foodLogs?: FoodLog[]
   recipes?: Recipe[]
   planEntries?: PlanEntry[]
+  bodyLogs?: BodyLog[]
 }
 
 export async function exportBackup(): Promise<string> {
@@ -79,6 +84,7 @@ export async function exportBackup(): Promise<string> {
     foodLogs: await db.foodLogs.toArray(),
     recipes: await db.recipes.toArray(),
     planEntries: await db.planEntries.toArray(),
+    bodyLogs: await db.bodyLogs.toArray(),
   }
   return JSON.stringify(backup, null, 2)
 }
@@ -89,7 +95,17 @@ export async function importBackup(json: string): Promise<void> {
   if (backup.app !== 'liftlog' || !Array.isArray(backup.workouts)) {
     throw new Error('Not a Lift Log backup file')
   }
-  const tables = [db.exercises, db.routines, db.workouts, db.settings, db.foods, db.foodLogs, db.recipes, db.planEntries]
+  const tables = [
+    db.exercises,
+    db.routines,
+    db.workouts,
+    db.settings,
+    db.foods,
+    db.foodLogs,
+    db.recipes,
+    db.planEntries,
+    db.bodyLogs,
+  ]
   await db.transaction('rw', tables, async () => {
     await Promise.all(tables.map((t) => t.clear()))
     await db.exercises.bulkAdd(backup.exercises ?? [])
@@ -100,5 +116,6 @@ export async function importBackup(json: string): Promise<void> {
     await db.foodLogs.bulkAdd(backup.foodLogs ?? [])
     await db.recipes.bulkAdd(backup.recipes ?? [])
     await db.planEntries.bulkAdd(backup.planEntries ?? [])
+    await db.bodyLogs.bulkAdd(backup.bodyLogs ?? [])
   })
 }

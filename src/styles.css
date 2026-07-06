@@ -69,8 +69,9 @@ button {
   color: var(--ink);
   -webkit-tap-highlight-color: transparent;
 }
-button:active { filter: brightness(1.2); }
+button:active { filter: brightness(1.2); transform: scale(0.98); }
 button:disabled { opacity: 0.45; cursor: default; }
+button { transition: transform 0.1s ease, filter 0.1s ease; }
 
 .btn-primary { background: var(--accent); color: #fff; font-weight: 600; }
 .btn-primary:active { background: var(--accent-press); }
@@ -78,6 +79,8 @@ button:disabled { opacity: 0.45; cursor: default; }
 .btn-ghost { background: transparent; color: var(--ink-2); border: 1px solid var(--border); }
 .btn-wide { width: 100%; }
 .btn-icon { min-width: 44px; padding: 0; font-size: 18px; line-height: 1; }
+.btn-flex { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.btn-icon svg { display: block; margin: 0 auto; }
 
 input, select, textarea {
   font: inherit;
@@ -111,14 +114,24 @@ label.field span { display: block; font-size: 13px; color: var(--ink-2); margin-
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 8px 0 10px;
+  gap: 3px;
+  padding: 7px 0 9px;
   text-decoration: none;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10.5px;
+  transition: color 0.18s ease;
 }
 .bottom-nav a.active { color: var(--accent); }
-.bottom-nav .nav-icon { font-size: 20px; line-height: 1; }
+.bottom-nav .nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  width: 52px;
+  border-radius: 999px;
+  transition: background 0.18s ease;
+}
+.bottom-nav a.active .nav-icon { background: color-mix(in srgb, var(--accent) 18%, transparent); }
 
 /* ---- workout logging ---- */
 .set-grid {
@@ -265,3 +278,56 @@ a.text-link { color: var(--accent); }
   z-index: 10;
 }
 .duration { font-variant-numeric: tabular-nums; }
+
+/* ---- motion ---- */
+@keyframes pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+@keyframes slide-up {
+  from { transform: translateY(24px); opacity: 0.4; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.screen > * { animation: fade-in 0.22s ease both; }
+.modal { animation: slide-up 0.22s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+.set-done-btn.done { animation: pop 0.3s ease; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* ---- dashboard ---- */
+.greeting { font-size: 24px; font-weight: 700; margin: 8px 0 2px; }
+.stat-row { display: flex; gap: 8px; }
+.stat-row .stat-tile { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.delta-up { color: var(--good); font-size: 12px; }
+.delta-down { color: var(--muted); font-size: 12px; }
+
+/* training heatmap — sequential blue ramp on the dark surface */
+.heatmap { display: flex; gap: 3px; justify-content: space-between; }
+.heatmap-col { display: flex; flex-direction: column; gap: 3px; }
+.heatmap-cell { width: 100%; aspect-ratio: 1; border-radius: 3px; background: var(--surface-2); }
+.heatmap-cell.l1 { background: #184f95; }
+.heatmap-cell.l2 { background: #256abf; }
+.heatmap-cell.l3 { background: #3987e5; }
+
+/* ---- rings ---- */
+.ring-wrap { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+.ring-wrap svg { transform: rotate(-90deg); }
+.ring-wrap circle { fill: none; }
+.ring-track { stroke: var(--accent-track); }
+.ring-fill { stroke: var(--accent); transition: stroke-dashoffset 0.5s ease, stroke 0.3s ease; }
+.ring-fill.over { stroke: var(--danger); }
+.ring-center { position: absolute; text-align: center; }
+.ring-center .big { font-size: 22px; font-weight: 700; line-height: 1.1; }
+
+/* ---- plate calculator ---- */
+.bar-diagram { display: flex; align-items: center; height: 84px; margin: 12px 0; }
+.bar-sleeve { height: 10px; background: var(--baseline); flex: 1; border-radius: 3px; }
+.plate-rect { border-radius: 4px; background: var(--accent); margin-left: 3px; flex-shrink: 0; }
+
+.pr-flash { color: #eda100; }

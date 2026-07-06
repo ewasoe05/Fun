@@ -5,37 +5,79 @@ import { db } from '../db'
 import type { Exercise, SetLog, Settings, Workout } from '../types'
 import { useSettings } from '../hooks/useSettings'
 import { buildSets, formatDuration, lastSessionSets, startWorkout } from '../lib/workoutHelpers'
-import { formatWeight } from '../lib/units'
+import { formatWeight, fromKg } from '../lib/units'
+import { addDays, toDateKey, todayKey, weekStart } from '../lib/nutrition'
+import { epley1RM } from '../lib/oneRepMax'
+import { bestBefore, recentPRs } from '../lib/prs'
 import SetRow from '../components/SetRow'
 import RestTimer from '../components/RestTimer'
 import ExercisePicker from '../components/ExercisePicker'
+import PlateCalculator from '../components/PlateCalculator'
+import Confetti from '../components/Confetti'
+import Heatmap from '../components/Heatmap'
+import { IconClipboard, IconPlates, IconTrophy } from '../components/icons'
 
 export default function WorkoutScreen() {
   // resolve to null (not undefined) so "no active workout" is distinguishable from "query loading"
   const active = useLiveQuery(async () => (await db.workouts.filter((w) => !w.finishedAt).first()) ?? null, [])
-  const routines = useLiveQuery(() => db.routines.orderBy('createdAt').toArray(), []) ?? []
   const settings = useSettings()
 
   if (active === undefined) return null
   if (active) return <ActiveWorkout key={active.id} initial={active} settings={settings} />
+  return <Dashboard settings={settings} />
+}
+
+function greeting(): string {
+  const h = new Date().getHours()
+  if (h < 5) return 'Night session?'
+  if (h < 12) return 'Good morning'
+  if (h < 17) return 'Good afternoon'
+  return 'Good evening'
+}
+
+function Dashboard({ settings }: { settings: Settings }) {
+  const routines = useLiveQuery(() => db.routines.orderBy('createdAt').toArray(), []) ?? []
+  const workouts = useLiveQuery(() => db.workouts.toArray(), []) ?? []
+
+  const { thisWeek, lastWeek, prs } = useMemo(() => {
+    const finished = workouts.filter((w) => w.finishedAt)
+    const startKey = weekStart(todayKey())
+    const prevKey = addDays(startKey, -7)
+    const stats = (from: string, to: string) => {
+      const ws = finished.filter((w) => {
+        const d = toDateKey(new Date(w.startedAt))
+        return d >= from && d < to
+      })
+      const sets = ws.flatMap((w) => w.entries.flatMap((e) => e.sets.filter((s) => s.done)))
+      return {
+        workouts: ws.length,
+        sets: sets.length,
+        volumeKg: sets.reduce((sum, s) => sum + s.weightKg * s.reps, 0),
+      }
+    }
+    return {
+      thisWeek: stats(startKey, addDays(startKey, 7)),
+      lastWeek: stats(prevKey, startKey),
+      prs: recentPRs(workouts, 3),
+    }
+  }, [workouts])
+
+  const compact = (n: number) =>
+    new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n)
+  const delta = thisWeek.workouts - lastWeek.workouts
 
   return (
     <>
-      <h1>Start a workout</h1>
+      <div className="greeting">{greeting()}</div>
+      <div className="muted small" style={{ marginBottom: 16 }}>
+        {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+      </div>
+
       <button className="btn-primary btn-wide" style={{ minHeight: 52 }} onClick={() => startWorkout()}>
         Start empty workout
       </button>
-      <h2>From a routine</h2>
-      {routines.length === 0 && (
-        <div className="empty">
-          <div className="big">📋</div>
-          No routines yet.{' '}
-          <Link className="text-link" to="/routines">
-            Create one
-          </Link>{' '}
-          to pre-load your exercises.
-        </div>
-      )}
+
+      {routines.length > 0 && <h2>From a routine</h2>}
       {routines.map((r) => (
         <button key={r.id} className="list-item" onClick={() => startWorkout(r)}>
           <div className="grow">
@@ -45,6 +87,76 @@ export default function WorkoutScreen() {
           <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Start</span>
         </button>
       ))}
+      {routines.length === 0 && (
+        <div className="empty">
+          <div style={{ color: 'var(--muted)', marginBottom: 8 }}>
+            <IconClipboard size={36} />
+          </div>
+          No routines yet.{' '}
+          <Link className="text-link" to="/routines">
+            Create one
+          </Link>{' '}
+          to pre-load your exercises.
+        </div>
+      )}
+
+      <h2>This week</h2>
+      <div className="stat-row">
+        <div className="stat-tile">
+          <div className="value">{thisWeek.workouts}</div>
+          <div className="label">workouts</div>
+          {lastWeek.workouts > 0 && delta !== 0 && (
+            <div className={delta > 0 ? 'delta-up' : 'delta-down'}>
+              {delta > 0 ? '▲' : '▼'} {Math.abs(delta)} vs last wk
+            </div>
+          )}
+        </div>
+        <div className="stat-tile">
+          <div className="value">{thisWeek.sets}</div>
+          <div className="label">sets</div>
+        </div>
+        <div className="stat-tile">
+          <div className="value">{compact(Math.round(fromKg(thisWeek.volumeKg, settings.units)))}</div>
+          <div className="label">volume ({settings.units})</div>
+        </div>
+      </div>
+
+      {workouts.some((w) => w.finishedAt) && (
+        <>
+          <h2>Consistency</h2>
+          <div className="card">
+            <Heatmap workouts={workouts} />
+          </div>
+        </>
+      )}
+
+      {prs.length > 0 && (
+        <>
+          <h2>Recent PRs</h2>
+          {prs.map((pr) => (
+            <Link
+              key={`${pr.exerciseId}-${pr.date}`}
+              className="list-item"
+              to={`/exercises/${pr.exerciseId}`}
+              style={{ alignItems: 'center' }}
+            >
+              <span className="pr-flash">
+                <IconTrophy size={24} />
+              </span>
+              <div className="grow">
+                <div>{pr.exerciseName}</div>
+                <div className="muted">
+                  {formatWeight(pr.weightKg, settings.units)} {settings.units} × {pr.reps} ·{' '}
+                  {new Date(pr.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                </div>
+              </div>
+              <span className="muted small">
+                est. 1RM {formatWeight(pr.oneRmKg, settings.units)} {settings.units}
+              </span>
+            </Link>
+          ))}
+        </>
+      )}
     </>
   )
 }
@@ -53,6 +165,9 @@ function ActiveWorkout({ initial, settings }: { initial: Workout; settings: Sett
   const [workout, setWorkout] = useState(initial)
   const [rest, setRest] = useState<{ endsAt: number; total: number } | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [platesFor, setPlatesFor] = useState<number | null>(null)
+  const [prKeys, setPrKeys] = useState<Set<string>>(new Set())
+  const [confetti, setConfetti] = useState(false)
   const [now, setNow] = useState(Date.now())
 
   useEffect(() => {
@@ -88,14 +203,23 @@ function ActiveWorkout({ initial, settings }: { initial: Workout; settings: Sett
     db.workouts.put(next)
   }
 
-  function updateSet(entryIdx: number, setIdx: number, set: SetLog) {
-    const wasDone = workout.entries[entryIdx].sets[setIdx].done
+  async function updateSet(entryIdx: number, setIdx: number, set: SetLog) {
+    const entry = workout.entries[entryIdx]
+    const wasDone = entry.sets[setIdx].done
     const entries = workout.entries.map((e, i) =>
       i === entryIdx ? { ...e, sets: e.sets.map((s, j) => (j === setIdx ? set : s)) } : e,
     )
     update({ ...workout, entries })
     if (set.done && !wasDone) {
       setRest({ endsAt: Date.now() + settings.restSeconds * 1000, total: settings.restSeconds })
+      // PR check against all previous finished sessions
+      const all = await db.workouts.toArray()
+      const best = bestBefore(all, entry.exerciseId, Date.now())
+      if (best > 0 && epley1RM(set.weightKg, set.reps) > best) {
+        setPrKeys((prev) => new Set(prev).add(`${entryIdx}-${setIdx}`))
+        setConfetti(true)
+        navigator.vibrate?.([100, 60, 100, 60, 250])
+      }
     }
   }
 
@@ -141,6 +265,11 @@ function ActiveWorkout({ initial, settings }: { initial: Workout; settings: Sett
     }
   }
 
+  function plateWeightFor(entryIdx: number): number {
+    const kg = Math.max(0, ...workout.entries[entryIdx].sets.map((s) => s.weightKg))
+    return kg > 0 ? Math.round(fromKg(kg, settings.units) * 10) / 10 : 0
+  }
+
   return (
     <>
       <div className="workout-header row-between">
@@ -161,6 +290,9 @@ function ActiveWorkout({ initial, settings }: { initial: Workout; settings: Sett
             <Link className="grow" to={`/exercises/${entry.exerciseId}`} style={{ color: 'var(--ink)', textDecoration: 'none', fontWeight: 600 }}>
               {entry.exerciseName}
             </Link>
+            <button className="btn-icon btn-ghost" onClick={() => setPlatesFor(ei)} aria-label="Plate calculator">
+              <IconPlates size={18} />
+            </button>
             <button className="btn-icon btn-ghost" onClick={() => removeExercise(ei)} aria-label="Remove exercise">
               ✕
             </button>
@@ -180,6 +312,7 @@ function ActiveWorkout({ initial, settings }: { initial: Workout; settings: Sett
                 index={si}
                 set={s}
                 units={settings.units}
+                pr={prKeys.has(`${ei}-${si}`)}
                 prevHint={prev ? `${formatWeight(prev.weightKg, settings.units)} × ${prev.reps}` : undefined}
                 onChange={(ns) => updateSet(ei, si, ns)}
               />
@@ -204,6 +337,14 @@ function ActiveWorkout({ initial, settings }: { initial: Workout; settings: Sett
       </button>
 
       {pickerOpen && <ExercisePicker onSelect={addExercise} onClose={() => setPickerOpen(false)} />}
+      {platesFor !== null && (
+        <PlateCalculator
+          initialWeight={plateWeightFor(platesFor)}
+          units={settings.units}
+          onClose={() => setPlatesFor(null)}
+        />
+      )}
+      {confetti && <Confetti onDone={() => setConfetti(false)} />}
       {rest && (
         <RestTimer
           endsAt={rest.endsAt}

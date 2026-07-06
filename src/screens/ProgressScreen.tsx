@@ -1,12 +1,15 @@
 import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { Link } from 'react-router-dom'
-import { db } from '../db'
+import { db, newId } from '../db'
+import type { Settings } from '../types'
 import { useSettings } from '../hooks/useSettings'
 import { sessionStats } from '../lib/oneRepMax'
 import { assessLifts } from '../lib/standards'
-import { formatWeight, formatWeightWithUnit, fromKg } from '../lib/units'
+import { formatWeight, formatWeightWithUnit, fromKg, toKg } from '../lib/units'
+import { todayKey } from '../lib/nutrition'
 import ProgressChart from '../components/ProgressChart'
+import { IconScale, IconTrendingUp } from '../components/icons'
 
 type Metric = '1rm' | 'top' | 'volume'
 
@@ -70,7 +73,9 @@ export default function ProgressScreen() {
   if (finished.length === 0) {
     return (
       <div className="empty">
-        <div className="big">📈</div>
+        <div style={{ color: 'var(--muted)', marginBottom: 8 }}>
+          <IconTrendingUp size={36} />
+        </div>
         Finish your first workout and your progress charts will show up here.
       </div>
     )
@@ -165,6 +170,8 @@ export default function ProgressScreen() {
         Levels compare your best estimated 1RM to bodyweight-ratio standards (Untrained → Elite).
       </p>
 
+      <BodyweightSection settings={settings} />
+
       <h2>History</h2>
       {finished.map((w) => {
         const sets = w.entries.flatMap((e) => e.sets)
@@ -195,6 +202,100 @@ export default function ProgressScreen() {
           </div>
         )
       })}
+    </>
+  )
+}
+
+function BodyweightSection({ settings }: { settings: Settings }) {
+  const [logOpen, setLogOpen] = useState(false)
+  const [weightStr, setWeightStr] = useState('')
+  const logs = useLiveQuery(() => db.bodyLogs.orderBy('date').toArray(), []) ?? []
+
+  const chartData = useMemo(
+    () =>
+      logs.map((l) => {
+        const [y, m, d] = l.date.split('-').map(Number)
+        return { date: new Date(y, m - 1, d).getTime(), value: Math.round(fromKg(l.weightKg, settings.units) * 10) / 10 }
+      }),
+    [logs, settings.units],
+  )
+
+  async function logWeight() {
+    const parsed = parseFloat(weightStr)
+    if (!Number.isFinite(parsed) || parsed <= 0) return
+    const weightKg = toKg(parsed, settings.units)
+    const today = todayKey()
+    const existing = await db.bodyLogs.where('date').equals(today).first()
+    if (existing) await db.bodyLogs.update(existing.id, { weightKg, loggedAt: Date.now() })
+    else await db.bodyLogs.add({ id: newId(), date: today, weightKg, loggedAt: Date.now() })
+    // keep strength standards + TDEE in sync with the newest weigh-in
+    await db.settings.put({ ...settings, bodyweightKg: weightKg })
+    setLogOpen(false)
+    setWeightStr('')
+  }
+
+  const latest = logs[logs.length - 1]
+
+  return (
+    <>
+      <h2>Bodyweight</h2>
+      <div className="card">
+        <div className="row-between">
+          <div className="row" style={{ color: 'var(--ink-2)' }}>
+            <IconScale size={20} />
+            <span>
+              {latest
+                ? `${formatWeightWithUnit(latest.weightKg, settings.units)}`
+                : settings.bodyweightKg
+                  ? `${formatWeightWithUnit(settings.bodyweightKg, settings.units)} (from Settings)`
+                  : 'Not set'}
+            </span>
+          </div>
+          <button className="btn-ghost" onClick={() => {
+            setWeightStr(
+              latest || settings.bodyweightKg
+                ? formatWeight((latest?.weightKg ?? settings.bodyweightKg)!, settings.units)
+                : '',
+            )
+            setLogOpen(true)
+          }}>
+            Log weight
+          </button>
+        </div>
+        {chartData.length >= 2 && (
+          <div style={{ marginTop: 8 }}>
+            <ProgressChart data={chartData} unitLabel={settings.units} />
+          </div>
+        )}
+        {chartData.length < 2 && (
+          <p className="muted small" style={{ marginBottom: 0 }}>
+            Log your weight regularly to see a trend line. Weigh-ins also keep your strength standards and calorie
+            targets accurate.
+          </p>
+        )}
+      </div>
+
+      {logOpen && (
+        <div className="modal-overlay" onClick={() => setLogOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="row-between">
+              <strong>Log bodyweight</strong>
+              <button className="btn-ghost" onClick={() => setLogOpen(false)}>
+                Close
+              </button>
+            </div>
+            <div className="modal-body">
+              <label className="field">
+                <span>Today's weight ({settings.units})</span>
+                <input inputMode="decimal" autoFocus value={weightStr} onChange={(e) => setWeightStr(e.target.value)} />
+              </label>
+              <button className="btn-primary btn-wide" disabled={!(parseFloat(weightStr) > 0)} onClick={logWeight}>
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
