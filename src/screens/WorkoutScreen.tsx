@@ -9,6 +9,8 @@ import { formatWeight, fromKg } from '../lib/units'
 import { addDays, toDateKey, todayKey, weekStart } from '../lib/nutrition'
 import { epley1RM } from '../lib/oneRepMax'
 import { bestBefore, recentPRs } from '../lib/prs'
+import { analyze } from '../lib/coach'
+import InsightCard from '../components/InsightCard'
 import SetRow from '../components/SetRow'
 import RestTimer from '../components/RestTimer'
 import ExercisePicker from '../components/ExercisePicker'
@@ -38,6 +40,20 @@ function greeting(): string {
 function Dashboard({ settings }: { settings: Settings }) {
   const routines = useLiveQuery(() => db.routines.orderBy('createdAt').toArray(), []) ?? []
   const workouts = useLiveQuery(() => db.workouts.toArray(), []) ?? []
+  const exercises = useLiveQuery(() => db.exercises.toArray(), []) ?? []
+  const foodLogs = useLiveQuery(() => db.foodLogs.toArray(), []) ?? []
+  const bodyLogs = useLiveQuery(() => db.bodyLogs.toArray(), []) ?? []
+
+  const insights = useMemo(() => {
+    if (settings.coachEnabled === false || !workouts.some((w) => w.finishedAt)) return []
+    return analyze({
+      workouts,
+      exercisesById: new Map(exercises.map((e) => [e.id, e])),
+      foodLogs,
+      bodyLogs,
+      settings,
+    }).slice(0, 3)
+  }, [workouts, exercises, foodLogs, bodyLogs, settings])
 
   const { thisWeek, lastWeek, prs } = useMemo(() => {
     const finished = workouts.filter((w) => w.finishedAt)
@@ -98,6 +114,20 @@ function Dashboard({ settings }: { settings: Settings }) {
           </Link>{' '}
           to pre-load your exercises.
         </div>
+      )}
+
+      {insights.length > 0 && (
+        <>
+          <div className="row-between" style={{ marginTop: 20, marginBottom: 8 }}>
+            <h2 style={{ margin: 0 }}>Coach</h2>
+            <Link className="text-link small" to="/coach">
+              All insights ›
+            </Link>
+          </div>
+          {insights.map((i) => (
+            <InsightCard key={i.id} insight={i} />
+          ))}
+        </>
       )}
 
       <h2>This week</h2>
@@ -243,8 +273,14 @@ function ActiveWorkout({ initial, settings }: { initial: Workout; settings: Sett
 
   async function addExercise(ex: Exercise) {
     setPickerOpen(false)
-    const sets = await buildSets(ex.id, 3, 8)
-    update({ ...workout, entries: [...workout.entries, { exerciseId: ex.id, exerciseName: ex.name, sets }] })
+    const built = await buildSets(ex.id, 3, 8)
+    update({
+      ...workout,
+      entries: [
+        ...workout.entries,
+        { exerciseId: ex.id, exerciseName: ex.name, sets: built.sets, suggestion: built.suggestion },
+      ],
+    })
   }
 
   async function finish() {
@@ -297,6 +333,20 @@ function ActiveWorkout({ initial, settings }: { initial: Workout; settings: Sett
               ✕
             </button>
           </div>
+          {entry.suggestion && (
+            <div
+              className={`suggest-chip ${entry.suggestion.change === 'down' ? 'suggest-down' : 'suggest-up'}`}
+              style={{ marginBottom: 10 }}
+            >
+              {entry.suggestion.change === 'down' ? '▼' : '▲'}{' '}
+              {entry.suggestion.change === 'up'
+                ? `+${entry.suggestion.deltaDisplay} ${settings.units}`
+                : entry.suggestion.change === 'reps'
+                  ? `+${entry.suggestion.deltaDisplay} rep`
+                  : `−${entry.suggestion.deltaDisplay} ${settings.units}`}{' '}
+              · {entry.suggestion.reason}
+            </div>
+          )}
           <div className="set-grid set-head">
             <div>Set</div>
             <div>Previous</div>

@@ -39,6 +39,12 @@ export interface WorkoutEntry {
   exerciseId: string
   exerciseName: string
   sets: SetLog[]
+  /** why the coach pre-filled these numbers (display only) */
+  suggestion?: {
+    change: 'up' | 'down' | 'reps'
+    deltaDisplay: number
+    reason: string
+  }
 }
 
 export interface Workout {
@@ -68,6 +74,10 @@ export interface Settings {
   proteinTarget?: number
   carbsTarget?: number
   fatTarget?: number
+  /** auto-progression + insights; defaults to on when unset */
+  coachEnabled?: boolean
+  /** when the coach last adjusted the calorie target (7-day cooldown) */
+  lastKcalAdjustAt?: number
 }
 
 export const DEFAULT_SETTINGS: Settings = {
