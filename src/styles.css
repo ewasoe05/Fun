@@ -331,3 +331,15 @@ a.text-link { color: var(--accent); }
 .plate-rect { border-radius: 4px; background: var(--accent); margin-left: 3px; flex-shrink: 0; }
 
 .pr-flash { color: #eda100; }
+
+/* coach suggestion chips */
+.suggest-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  border-radius: 999px;
+  padding: 4px 11px;
+}
+.suggest-up { color: var(--good); background: color-mix(in srgb, var(--good) 13%, transparent); }
+.suggest-down { color: #eda100; background: color-mix(in srgb, #eda100 13%, transparent); }

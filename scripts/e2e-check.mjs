@@ -71,7 +71,14 @@ await page.evaluate(async () => {
       req.onerror = () => rej(req.error)
     })
   const idb = await open()
-  const tx = idb.transaction(['workouts', 'settings', 'foodLogs'], 'readwrite')
+  const tx = idb.transaction(['workouts', 'settings', 'foodLogs', 'bodyLogs'], 'readwrite')
+  // flat bodyweight while "cutting" → coach proposes a calorie cut
+  const bodyLogs = tx.objectStore('bodyLogs')
+  for (const daysAgo of [20, 14, 7, 1]) {
+    const d = new Date(Date.now() - daysAgo * 24 * 3600 * 1000)
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    bodyLogs.put({ id: `demo-bw-${daysAgo}`, date: key, weightKg: 82, loggedAt: d.getTime() })
+  }
   const foodLogs = tx.objectStore('foodLogs')
   // a week of prior calorie history so the 14-day chart renders
   for (let i = 1; i <= 7; i++) {
@@ -106,13 +113,29 @@ await page.evaluate(async () => {
         { exerciseId: 'seed-bench-press', exerciseName: 'Bench Press', sets: sets(52.5 + i * 2.5, 8) },
         { exerciseId: 'seed-back-squat', exerciseName: 'Back Squat', sets: sets(70 + i * 5, 5) },
         { exerciseId: 'seed-deadlift', exerciseName: 'Deadlift', sets: [set(90 + i * 6, 5)] },
-        { exerciseId: 'seed-overhead-press', exerciseName: 'Overhead Press', sets: sets(32.5 + i * 1.5, 8) },
+        // last two OHP sessions: same weight, missed reps → coach should suggest a deload
+        {
+          exerciseId: 'seed-overhead-press',
+          exerciseName: 'Overhead Press',
+          sets: i >= 7 ? sets(43, 6) : sets(32.5 + i * 1.5, 8),
+        },
         { exerciseId: 'seed-barbell-row', exerciseName: 'Barbell Row', sets: sets(50 + i * 2.5, 8) },
       ],
     }
   }
   for (let i = 1; i <= 8; i++) workouts.put(mk(i))
-  tx.objectStore('settings').put({ id: 'main', units: 'lb', sex: 'male', bodyweightKg: 82, restSeconds: 90 })
+  tx.objectStore('settings').put({
+    id: 'main',
+    units: 'lb',
+    sex: 'male',
+    bodyweightKg: 82,
+    restSeconds: 90,
+    goal: 'cut',
+    kcalTarget: 2300,
+    proteinTarget: 148,
+    carbsTarget: 285,
+    fatTarget: 64,
+  })
   await new Promise((res, rej) => {
     tx.oncomplete = res
     tx.onerror = () => rej(tx.error)
@@ -128,6 +151,23 @@ await page.locator('.heatmap').waitFor()
 const statValues = await page.locator('.stat-row .value').allTextContents()
 console.log('this-week stats (workouts/sets/volume):', statValues)
 await shot('0-dashboard')
+
+step('coach: insights + 1-tap calorie adjustment')
+await page.getByRole('heading', { name: 'Coach' }).waitFor()
+await page.getByText('Cutting, but weight isn’t moving').waitFor()
+await page.getByRole('button', { name: 'Set target to 2,100 kcal' }).click()
+// applying re-runs the analysis: the action card morphs into the 7-day-cooldown info card
+await page.getByText('Calorie target recently adjusted').waitFor()
+console.log('applied → cooldown card shown ✔')
+await page.getByRole('link', { name: 'All insights ›' }).click()
+await page.getByText('How the coach thinks').waitFor()
+await shot('15-coach-screen')
+await page.getByRole('button', { name: '‹ Back' }).click()
+// applied patch actually landed in settings?
+await page.getByRole('link', { name: /Settings/ }).click()
+await page.getByRole('heading', { name: 'Nutrition' }).waitFor()
+console.log('kcal target after Apply:', await page.locator('label:has-text("kcal target") input').inputValue())
+await page.locator('.bottom-nav').getByRole('link', { name: 'Workout' }).click()
 
 step('create a routine')
 await page.getByRole('link', { name: /Routines/ }).click()
@@ -153,9 +193,15 @@ await page.getByText(/sets done/).waitFor()
 // previous-session hints present for bench (from demo history)?
 const firstPrev = await page.locator('.card').first().locator('.prev-hint').first().textContent()
 console.log('bench previous hint:', JSON.stringify(firstPrev))
-// prefilled weight from last session?
+// coach auto-progression: all reps hit last time → 159.8 + 2.5, grid-rounded
 const prefill = await page.locator('.card').first().locator('.set-grid input').first().inputValue()
-console.log('bench prefilled weight (lb):', prefill)
+console.log('bench coach prefill (expect 162.5):', prefill)
+const benchChip = await page.locator('.card', { hasText: 'Bench Press' }).locator('.suggest-chip').textContent()
+console.log('bench chip:', benchChip.replace(/\s+/g, ' ').trim())
+// OHP missed reps twice at the same weight → deload chip + ~90% prefill
+const ohpCard = page.locator('.card', { hasText: 'Overhead Press' })
+console.log('OHP chip:', (await ohpCard.locator('.suggest-chip.suggest-down').textContent()).replace(/\s+/g, ' ').trim())
+console.log('OHP deload prefill (expect 85):', await ohpCard.locator('.set-grid input').first().inputValue())
 await shot('1-active-workout')
 
 step('log sets + rest timer')
@@ -333,6 +379,17 @@ console.log('backup contents:', {
   recipes: backup.recipes?.length,
   planEntries: backup.planEntries?.length,
 })
+
+step('coach toggle off → plain last-session prefill')
+await page.locator('label:has-text("Coach & auto-progression") select').selectOption('off')
+await page.locator('.bottom-nav').getByRole('link', { name: 'Workout' }).click()
+await page.locator('.list-item', { hasText: 'Push Day' }).click()
+await page.getByText(/sets done/).waitFor()
+const offPrefill = await page.locator('.card').first().locator('.set-grid input').first().inputValue()
+const chips = await page.locator('.suggest-chip').count()
+console.log(`coach off: bench prefill ${offPrefill} (expect 165 = last session), suggestion chips: ${chips}`)
+await page.getByRole('button', { name: 'Discard workout' }).click()
+await page.getByText('Start empty workout').waitFor()
 
 step('offline check (block network, reload)')
 // route interception makes Chromium bypass service workers — remove it first

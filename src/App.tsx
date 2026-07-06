@@ -9,6 +9,7 @@ import ProgressScreen from './screens/ProgressScreen'
 import SettingsScreen from './screens/SettingsScreen'
 import FoodScreen from './screens/FoodScreen'
 import RecipeDetailScreen from './screens/RecipeDetailScreen'
+import CoachScreen from './screens/CoachScreen'
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
             <Route path="/progress" element={<ProgressScreen />} />
             <Route path="/food" element={<FoodScreen />} />
             <Route path="/food/recipes/:id" element={<RecipeDetailScreen />} />
+            <Route path="/coach" element={<CoachScreen />} />
             <Route path="/settings" element={<SettingsScreen />} />
           </Routes>
         </main>

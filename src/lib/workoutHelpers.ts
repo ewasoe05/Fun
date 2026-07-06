@@ -1,27 +1,49 @@
-import { db, newId } from '../db'
+import { db, getSettings, newId } from '../db'
 import type { Routine, SetLog, Workout, WorkoutEntry } from '../types'
+import { suggestNextSets, type SuggestResult } from './coach'
 
-/** Done sets from the most recent finished workout that includes this exercise. */
-export async function lastSessionSets(exerciseId: string): Promise<SetLog[]> {
+/** Done sets from the N most recent finished workouts that include this exercise (most recent first). */
+export async function lastSessions(exerciseId: string, n: number): Promise<SetLog[][]> {
   const workouts = await db.workouts.orderBy('startedAt').reverse().toArray()
+  const out: SetLog[][] = []
   for (const w of workouts) {
     if (!w.finishedAt) continue
     const sets = w.entries
       .filter((e) => e.exerciseId === exerciseId)
       .flatMap((e) => e.sets)
       .filter((s) => s.done)
-    if (sets.length > 0) return sets
+    if (sets.length > 0) {
+      out.push(sets)
+      if (out.length >= n) break
+    }
   }
-  return []
+  return out
 }
 
-/** New unchecked sets, pre-filled from the previous session (falling back to targets). */
-export async function buildSets(exerciseId: string, targetSets: number, targetReps: number): Promise<SetLog[]> {
-  const prev = await lastSessionSets(exerciseId)
-  return Array.from({ length: targetSets }, (_, i) => {
-    const p = prev[i] ?? prev[prev.length - 1]
-    return { weightKg: p?.weightKg ?? 0, reps: p?.reps ?? targetReps, done: false }
-  })
+/** Done sets from the most recent finished workout that includes this exercise. */
+export async function lastSessionSets(exerciseId: string): Promise<SetLog[]> {
+  return (await lastSessions(exerciseId, 1))[0] ?? []
+}
+
+/**
+ * New unchecked sets for the next session. With the coach enabled (default),
+ * weights auto-progress/deload per the coach rules; otherwise last session's
+ * numbers are copied as before.
+ */
+export async function buildSets(exerciseId: string, targetSets: number, targetReps: number): Promise<SuggestResult> {
+  const settings = await getSettings()
+  const sessions = await lastSessions(exerciseId, 2)
+  if (settings.coachEnabled === false) {
+    const prev = sessions[0] ?? []
+    return {
+      sets: Array.from({ length: targetSets }, (_, i) => {
+        const p = prev[i] ?? prev[prev.length - 1]
+        return { weightKg: p?.weightKg ?? 0, reps: p?.reps ?? targetReps, done: false }
+      }),
+    }
+  }
+  const exercise = await db.exercises.get(exerciseId)
+  return suggestNextSets(exercise, sessions, targetSets, targetReps, settings.units)
 }
 
 export async function startWorkout(routine?: Routine): Promise<Workout> {
@@ -29,10 +51,12 @@ export async function startWorkout(routine?: Routine): Promise<Workout> {
   if (routine) {
     for (const en of routine.entries) {
       const ex = await db.exercises.get(en.exerciseId)
+      const built = await buildSets(en.exerciseId, en.targetSets, en.targetReps)
       entries.push({
         exerciseId: en.exerciseId,
         exerciseName: ex?.name ?? 'Unknown exercise',
-        sets: await buildSets(en.exerciseId, en.targetSets, en.targetReps),
+        sets: built.sets,
+        suggestion: built.suggestion,
       })
     }
   }

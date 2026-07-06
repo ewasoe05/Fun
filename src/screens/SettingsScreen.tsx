@@ -89,6 +89,17 @@ export default function SettingsScreen() {
         />
       </label>
 
+      <label className="field">
+        <span>Coach & auto-progression</span>
+        <select
+          value={settings.coachEnabled === false ? 'off' : 'on'}
+          onChange={(e) => save({ coachEnabled: e.target.value === 'on' })}
+        >
+          <option value="on">On — auto-adjust next workout's weights & show insights</option>
+          <option value="off">Off — always pre-fill last session's numbers</option>
+        </select>
+      </label>
+
       <h2>Nutrition</h2>
       <NumSetting
         label="Height (cm)"
