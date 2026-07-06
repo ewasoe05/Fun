@@ -12,7 +12,8 @@ A local-first workout tracker PWA for logging weight lifting on your phone.
 - **Progress charts** — estimated 1RM (Epley), top set, and session volume over time per exercise
 - **Strength standards** — see where each big lift lands from Untrained → Elite for your bodyweight and sex
 - **Exercise library** — ~40 built-in lifts, plus online search of the free [wger.de](https://wger.de) exercise database (instructions, muscles, images, demo videos), cached for offline use
-- **Local & private** — everything is stored in your browser (IndexedDB); one-tap JSON export/import for backups
+- **Profiles** — multiple people can share a device, each with fully separate data
+- **Local & private** — everything is stored in your browser (IndexedDB); one-tap JSON export/import for backups (per profile)
 - **Offline-capable PWA** — works in the gym with no signal once installed
 
 ## Install it on your phone

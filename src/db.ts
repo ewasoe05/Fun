@@ -1,6 +1,7 @@
 import Dexie, { type Table } from 'dexie'
 import type { BodyLog, Exercise, Food, FoodLog, PlanEntry, Recipe, Routine, Settings, Workout } from './types'
 import { DEFAULT_SETTINGS } from './types'
+import { dbName, getActiveProfile } from './lib/profiles'
 import seedExercises from './data/seed-exercises.json'
 
 class LiftLogDB extends Dexie {
@@ -15,7 +16,8 @@ class LiftLogDB extends Dexie {
   bodyLogs!: Table<BodyLog, string>
 
   constructor() {
-    super('liftlog')
+    // each profile owns its own database; 'default' is the original 'liftlog'
+    super(dbName(getActiveProfile().id))
     this.version(1).stores({
       exercises: 'id, name, source, wgerId',
       routines: 'id, name, createdAt',
