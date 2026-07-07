@@ -182,6 +182,22 @@ export default function SettingsScreen() {
         <NumSetting label="Fat g" value={settings.fatTarget} onChange={(v) => save({ fatTarget: v })} grow />
       </div>
 
+      <label className="field">
+        <span>Spoonacular API key (optional) — mixes real online recipes into macro-fitted meal plans</span>
+        <input
+          placeholder="Paste key… (leave empty to use the built-in catalog only)"
+          value={settings.spoonacularKey ?? ''}
+          onChange={(e) => save({ spoonacularKey: e.target.value.trim() || undefined })}
+        />
+      </label>
+      <p className="muted small" style={{ marginTop: -6 }}>
+        Free key at{' '}
+        <a className="text-link" href="https://spoonacular.com/food-api" target="_blank" rel="noreferrer">
+          spoonacular.com/food-api
+        </a>
+        . Without one, plans still fit your macros using the built-in offline meal catalog.
+      </p>
+
       {typeof Notification !== 'undefined' && Notification.permission === 'default' && (
         <button className="btn-ghost btn-wide" onClick={() => Notification.requestPermission()}>
           Enable rest-timer notifications

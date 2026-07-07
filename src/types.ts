@@ -78,6 +78,8 @@ export interface Settings {
   coachEnabled?: boolean
   /** when the coach last adjusted the calorie target (7-day cooldown) */
   lastKcalAdjustAt?: number
+  /** optional: mixes real online recipes into macro-fitted meal plans */
+  spoonacularKey?: string
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -98,8 +100,8 @@ export interface MacroSet {
 
 export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack'
 export const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack']
-export type PlanMeal = 'breakfast' | 'lunch' | 'dinner'
-export const PLAN_MEALS: PlanMeal[] = ['breakfast', 'lunch', 'dinner']
+export type PlanMeal = 'breakfast' | 'lunch' | 'dinner' | 'snack'
+export const PLAN_MEALS: PlanMeal[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
 export interface Food {
   id: string
@@ -164,4 +166,8 @@ export interface PlanEntry {
   meal: PlanMeal
   recipeId?: string
   title: string
+  /** set on macro-fitted entries */
+  macros?: MacroSet
+  portionDesc?: string
+  sourceUrl?: string
 }

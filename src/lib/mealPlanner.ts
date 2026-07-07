@@ -67,13 +67,16 @@ export async function fillWeek(start: string): Promise<FillResult> {
   let offlineFallback = false
   let breakfastPool: MealStub[] = []
   let mainPool: MealStub[] = []
+  let snackPool: MealStub[] = []
   try {
     const categories = shuffle(MAIN_CATEGORIES).slice(0, 3)
-    const [breakfast, ...mains] = await Promise.all([
+    const [breakfast, snacks, ...mains] = await Promise.all([
       listCategory('Breakfast'),
+      listCategory('Dessert'),
       ...categories.map((c) => listCategory(c).then((list) => ({ c, list }))),
     ])
     breakfastPool = shuffle(breakfast)
+    snackPool = shuffle(snacks)
     mainPool = shuffle(mains.flatMap((m) => m.list.map((s) => ({ ...s, _cat: m.c }) as MealStub & { _cat: string })))
   } catch {
     offlineFallback = true
@@ -104,6 +107,8 @@ export async function fillWeek(start: string): Promise<FillResult> {
     let recipe: Recipe | null = null
     if (slot.meal === 'breakfast') {
       recipe = await takeStub(breakfastPool, 'Breakfast')
+    } else if (slot.meal === 'snack') {
+      recipe = await takeStub(snackPool, 'Dessert')
     } else {
       recipe = cookbook.shift() ?? (await takeStub(mainPool, 'Main'))
     }
