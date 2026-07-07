@@ -30,9 +30,24 @@ Your workout data lives only on your device. Use **Settings → Export data** fo
 ```bash
 npm install
 npm run dev        # local dev server
-npm run build      # type-check + production build to dist/
+npm run build      # type-check + production build to dist/ (GitHub Pages base /Fun/)
+npm run build:cap  # same build with a relative base — for Capacitor & other native wrappers
 npm run icons      # regenerate PWA icons (needs Chromium)
 ```
+
+### Wrapping with Capacitor
+
+The compiled app is plain static files in `dist/`, so a native shell just points at it:
+
+```bash
+npm install @capacitor/core && npm install -D @capacitor/cli
+npx cap init "Lift Log" com.example.liftlog --web-dir dist
+npm run build:cap && npx cap add ios   # and/or: npx cap add android
+npx cap sync && npx cap open ios
+```
+
+Use `npm run build:cap` (not `npm run build`) before every `cap sync` — it emits relative
+asset paths for the native webview instead of the GitHub Pages `/Fun/` base.
 
 Built with Vite + React + TypeScript, Dexie (IndexedDB), Recharts, and vite-plugin-pwa.
 
