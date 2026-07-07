@@ -1,6 +1,7 @@
 import { db, getSettings, newId } from '../db'
 import type { Routine, SetLog, Workout, WorkoutEntry } from '../types'
 import { suggestNextSets, type SuggestResult } from './coach'
+import { findSubstitutes, generateWorkout, getActiveGym, isAvailable } from './equipment'
 
 /** Done sets from the N most recent finished workouts that include this exercise (most recent first). */
 export async function lastSessions(exerciseId: string, n: number): Promise<SetLog[][]> {
@@ -47,16 +48,31 @@ export async function buildSets(exerciseId: string, targetSets: number, targetRe
 }
 
 export async function startWorkout(routine?: Routine): Promise<Workout> {
+  const settings = await getSettings()
+  const gym = getActiveGym(settings)
+  const library = gym ? await db.exercises.toArray() : []
+
   const entries: WorkoutEntry[] = []
   if (routine) {
     for (const en of routine.entries) {
-      const ex = await db.exercises.get(en.exerciseId)
-      const built = await buildSets(en.exerciseId, en.targetSets, en.targetReps)
+      let ex = await db.exercises.get(en.exerciseId)
+      let subbedFrom: string | undefined
+      // adapt to the active gym's equipment
+      if (ex && gym && !isAvailable(ex, gym)) {
+        const sub = findSubstitutes(ex, gym, library)[0]
+        if (sub) {
+          subbedFrom = ex.name
+          ex = sub
+        }
+      }
+      const exerciseId = ex?.id ?? en.exerciseId
+      const built = await buildSets(exerciseId, en.targetSets, en.targetReps)
       entries.push({
-        exerciseId: en.exerciseId,
+        exerciseId,
         exerciseName: ex?.name ?? 'Unknown exercise',
         sets: built.sets,
         suggestion: built.suggestion,
+        subbedFrom,
       })
     }
   }
@@ -71,6 +87,29 @@ export async function startWorkout(routine?: Routine): Promise<Workout> {
   if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
     Notification.requestPermission().catch(() => {})
   }
+  return workout
+}
+
+/** Generate and start a full-body session from the active gym's equipment. */
+export async function startQuickWorkout(): Promise<Workout> {
+  const settings = await getSettings()
+  const gym = getActiveGym(settings)
+  const library = await db.exercises.toArray()
+  const workouts = await db.workouts.toArray()
+  const picks = generateWorkout(gym, library, workouts)
+
+  const entries: WorkoutEntry[] = []
+  for (const ex of picks) {
+    const built = await buildSets(ex.id, 3, 10)
+    entries.push({ exerciseId: ex.id, exerciseName: ex.name, sets: built.sets, suggestion: built.suggestion })
+  }
+  const workout: Workout = {
+    id: newId(),
+    startedAt: Date.now(),
+    routineName: `Quick workout · ${gym?.name ?? 'Full gym'}`,
+    entries,
+  }
+  await db.workouts.add(workout)
   return workout
 }
 

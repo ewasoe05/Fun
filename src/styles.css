@@ -343,6 +343,20 @@ a.text-link { color: var(--accent); }
 }
 .suggest-up { color: var(--good); background: color-mix(in srgb, var(--good) 13%, transparent); }
 .suggest-down { color: #eda100; background: color-mix(in srgb, #eda100 13%, transparent); }
+.suggest-swap { color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent); }
+
+.gym-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--ink-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
 
 /* profile avatars */
 .avatar {

@@ -187,6 +187,19 @@ export const IconBolt = (p: P) => (
   </Svg>
 )
 
+export const IconSwap = (p: P) => (
+  <Svg {...p}>
+    <path d="M7 4 3.5 7.5 7 11M3.5 7.5h13M17 13l3.5 3.5L17 20m3.5-3.5h-13" />
+  </Svg>
+)
+
+export const IconPin = (p: P) => (
+  <Svg {...p}>
+    <path d="M12 21.5s-6.5-6.1-6.5-11a6.5 6.5 0 0 1 13 0c0 4.9-6.5 11-6.5 11Z" />
+    <circle cx="12" cy="10.2" r="2.3" />
+  </Svg>
+)
+
 export const IconBook = (p: P) => (
   <Svg {...p}>
     <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21V5.5Z" />

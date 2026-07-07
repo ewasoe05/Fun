@@ -45,6 +45,8 @@ export interface WorkoutEntry {
     deltaDisplay: number
     reason: string
   }
+  /** original exercise name when equipment adaptation swapped it */
+  subbedFrom?: string
 }
 
 export interface Workout {
@@ -80,6 +82,26 @@ export interface Settings {
   lastKcalAdjustAt?: number
   /** optional: mixes real online recipes into macro-fitted meal plans */
   spoonacularKey?: string
+  /** gym equipment profiles for travel-adaptive workouts */
+  gyms?: GymProfile[]
+  /** unset = "Full gym" (no equipment filtering) */
+  activeGymId?: string
+}
+
+export type EquipKey =
+  | 'barbell'
+  | 'dumbbell'
+  | 'kettlebell'
+  | 'machine'
+  | 'cable'
+  | 'bench'
+  | 'pullupBar'
+  | 'bands'
+
+export interface GymProfile {
+  id: string
+  name: string
+  equipment: EquipKey[]
 }
 
 export const DEFAULT_SETTINGS: Settings = {

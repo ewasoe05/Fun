@@ -4,7 +4,9 @@ import { Link } from 'react-router-dom'
 import { db } from '../db'
 import type { Exercise, SetLog, Settings, Workout } from '../types'
 import { useSettings } from '../hooks/useSettings'
-import { buildSets, formatDuration, lastSessionSets, startWorkout } from '../lib/workoutHelpers'
+import { buildSets, formatDuration, lastSessionSets, startQuickWorkout, startWorkout } from '../lib/workoutHelpers'
+import { findSubstitutes, getActiveGym, requiredEquipment } from '../lib/equipment'
+import GymPicker from '../components/GymPicker'
 import { formatWeight, fromKg } from '../lib/units'
 import { addDays, toDateKey, todayKey, weekStart } from '../lib/nutrition'
 import { epley1RM } from '../lib/oneRepMax'
@@ -18,7 +20,7 @@ import ExercisePicker from '../components/ExercisePicker'
 import PlateCalculator from '../components/PlateCalculator'
 import Confetti from '../components/Confetti'
 import Heatmap from '../components/Heatmap'
-import { IconClipboard, IconPlates, IconTrophy } from '../components/icons'
+import { IconBolt, IconClipboard, IconPin, IconPlates, IconSwap, IconTrophy } from '../components/icons'
 
 export default function WorkoutScreen() {
   // resolve to null (not undefined) so "no active workout" is distinguishable from "query loading"
@@ -84,6 +86,8 @@ function Dashboard({ settings }: { settings: Settings }) {
   const delta = thisWeek.workouts - lastWeek.workouts
 
   const profile = getActiveProfile()
+  const gym = getActiveGym(settings)
+  const [gymOpen, setGymOpen] = useState(false)
 
   return (
     <>
@@ -92,7 +96,7 @@ function Dashboard({ settings }: { settings: Settings }) {
           <div className="greeting">
             {greeting()}, {profile.name}
           </div>
-          <div className="muted small" style={{ marginBottom: 16 }}>
+          <div className="muted small" style={{ marginBottom: 8 }}>
             {new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
           </div>
         </div>
@@ -103,16 +107,28 @@ function Dashboard({ settings }: { settings: Settings }) {
         </Link>
       </div>
 
-      <button className="btn-primary btn-wide" style={{ minHeight: 52 }} onClick={() => startWorkout()}>
+      <button className="gym-chip" onClick={() => setGymOpen(true)}>
+        <IconPin size={14} /> {gym?.name ?? 'Full gym'}
+      </button>
+
+      <button className="btn-primary btn-wide" style={{ minHeight: 52, marginTop: 12 }} onClick={() => startWorkout()}>
         Start empty workout
       </button>
+      {gym && (
+        <button className="btn-flex btn-wide" style={{ marginTop: 8 }} onClick={() => startQuickWorkout()}>
+          <IconBolt size={16} /> Quick workout for {gym.name}
+        </button>
+      )}
 
       {routines.length > 0 && <h2>From a routine</h2>}
       {routines.map((r) => (
         <button key={r.id} className="list-item" onClick={() => startWorkout(r)}>
           <div className="grow">
             <div>{r.name}</div>
-            <div className="muted">{r.entries.length} exercises</div>
+            <div className="muted">
+              {r.entries.length} exercises
+              {gym ? ` · adapts to ${gym.name}` : ''}
+            </div>
           </div>
           <span style={{ color: 'var(--accent)', fontWeight: 600 }}>Start</span>
         </button>
@@ -201,6 +217,8 @@ function Dashboard({ settings }: { settings: Settings }) {
           ))}
         </>
       )}
+
+      {gymOpen && <GymPicker settings={settings} onClose={() => setGymOpen(false)} />}
     </>
   )
 }
@@ -210,6 +228,8 @@ function ActiveWorkout({ initial, settings }: { initial: Workout; settings: Sett
   const [rest, setRest] = useState<{ endsAt: number; total: number } | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [platesFor, setPlatesFor] = useState<number | null>(null)
+  const [swapFor, setSwapFor] = useState<number | null>(null)
+  const [swapChoices, setSwapChoices] = useState<Exercise[]>([])
   const [prKeys, setPrKeys] = useState<Set<string>>(new Set())
   const [confetti, setConfetti] = useState(false)
   const [now, setNow] = useState(Date.now())
@@ -320,6 +340,42 @@ function ActiveWorkout({ initial, settings }: { initial: Workout; settings: Sett
     return kg > 0 ? Math.round(fromKg(kg, settings.units) * 10) / 10 : 0
   }
 
+  async function openSwap(entryIdx: number) {
+    const entry = workout.entries[entryIdx]
+    if (
+      entry.sets.some((s) => s.done) &&
+      !confirm('This exercise has completed sets — swapping replaces them. Continue?')
+    ) {
+      return
+    }
+    const ex = await db.exercises.get(entry.exerciseId)
+    if (!ex) return
+    const library = await db.exercises.toArray()
+    setSwapChoices(findSubstitutes(ex, getActiveGym(settings), library))
+    setSwapFor(entryIdx)
+  }
+
+  async function applySwap(ex: Exercise) {
+    const entryIdx = swapFor!
+    const old = workout.entries[entryIdx]
+    setSwapFor(null)
+    const built = await buildSets(ex.id, Math.max(1, old.sets.length), 8)
+    update({
+      ...workout,
+      entries: workout.entries.map((e, i) =>
+        i === entryIdx
+          ? {
+              exerciseId: ex.id,
+              exerciseName: ex.name,
+              sets: built.sets,
+              suggestion: built.suggestion,
+              subbedFrom: old.subbedFrom ?? old.exerciseName,
+            }
+          : e,
+      ),
+    })
+  }
+
   return (
     <>
       <div className="workout-header row-between">
@@ -340,6 +396,9 @@ function ActiveWorkout({ initial, settings }: { initial: Workout; settings: Sett
             <Link className="grow" to={`/exercises/${entry.exerciseId}`} style={{ color: 'var(--ink)', textDecoration: 'none', fontWeight: 600 }}>
               {entry.exerciseName}
             </Link>
+            <button className="btn-icon btn-ghost" onClick={() => openSwap(ei)} aria-label="Swap exercise">
+              <IconSwap size={17} />
+            </button>
             <button className="btn-icon btn-ghost" onClick={() => setPlatesFor(ei)} aria-label="Plate calculator">
               <IconPlates size={18} />
             </button>
@@ -347,6 +406,11 @@ function ActiveWorkout({ initial, settings }: { initial: Workout; settings: Sett
               ✕
             </button>
           </div>
+          {entry.subbedFrom && (
+            <div className="suggest-chip suggest-swap" style={{ marginBottom: 10, marginRight: 6 }}>
+              <IconSwap size={13} /> swapped from {entry.subbedFrom}
+            </div>
+          )}
           {entry.suggestion && (
             <div
               className={`suggest-chip ${entry.suggestion.change === 'down' ? 'suggest-down' : 'suggest-up'}`}
@@ -401,6 +465,33 @@ function ActiveWorkout({ initial, settings }: { initial: Workout; settings: Sett
       </button>
 
       {pickerOpen && <ExercisePicker onSelect={addExercise} onClose={() => setPickerOpen(false)} />}
+      {swapFor !== null && (
+        <div className="modal-overlay" onClick={() => setSwapFor(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="row-between">
+              <strong>Swap {workout.entries[swapFor]?.exerciseName}</strong>
+              <button className="btn-ghost" onClick={() => setSwapFor(null)}>
+                Close
+              </button>
+            </div>
+            <div className="modal-body">
+              {swapChoices.length === 0 && <p className="empty">No good alternatives found for this equipment.</p>}
+              {swapChoices.map((ex) => (
+                <button key={ex.id} className="list-item" onClick={() => applySwap(ex)}>
+                  <div className="grow">
+                    <div>{ex.name}</div>
+                    <div className="muted">
+                      {[ex.primaryMuscles.slice(0, 2).join(', '), requiredEquipment(ex).length === 0 ? 'bodyweight' : ex.equipment]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       {platesFor !== null && (
         <PlateCalculator
           initialWeight={plateWeightFor(platesFor)}
