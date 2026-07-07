@@ -48,6 +48,9 @@ if (foodFixtures) {
   await page.route('**world.openfoodfacts.org/api/v2/product/**', (route) =>
     route.fulfill({ contentType: 'application/json', body: json('fix-off-barcode.json') }),
   )
+  await page.route('**api.spoonacular.com/recipes/complexSearch**', (route) =>
+    route.fulfill({ contentType: 'application/json', body: json('fix-spoon-search.json') }),
+  )
   await page.route('**themealdb.com/api/**', (route) => {
     const url = route.request().url()
     if (url.includes('random.php')) {
@@ -368,12 +371,12 @@ if (foodFixtures) {
   console.log('plan shows the saved recipe on today ✔')
   await shot('14-meal-plan')
 
-  step('fill week with meals (optional generator)')
+  step('fill week: surprise recipes mode (now incl. snacks)')
   await page.getByRole('button', { name: '✨ Fill week with meals' }).click()
+  await page.getByText('Surprise recipes').click()
   await page.getByText(/Filled \d+ meals/).waitFor({ timeout: 15000 })
   const filledSlots = await page.locator('[aria-label="Remove"]').count()
-  console.log(`filled slots after generator (expect 21): ${filledSlots}`)
-  await shot('16-plan-filled')
+  console.log(`filled slots after surprise fill (expect 28 = 7×4): ${filledSlots}`)
   // generated entries are stubs — opening one lazily fetches full details
   const mondayBreakfast = page.locator('.card').first().locator('.row', { hasText: 'Breakfast' }).locator('button').first()
   await mondayBreakfast.click()
@@ -386,6 +389,59 @@ if (foodFixtures) {
   await page.getByRole('button', { name: 'Clear', exact: true }).click()
   await page.waitForFunction(() => document.querySelectorAll('[aria-label="Remove"]').length === 0)
   console.log('week cleared ✔')
+
+  step('fill week: macro-fitted mode')
+  await page.getByRole('button', { name: '✨ Fill week with meals' }).click()
+  await page.getByText('Fit my macros').click()
+  await page.getByText(/fitted to your daily targets/).waitFor({ timeout: 15000 })
+  const macroSlots = await page.locator('[aria-label="Remove"]').count()
+  const snackRows = await page.getByText('Snack', { exact: true }).count()
+  const footer = await page.locator('.card', { hasText: /^Monday/ }).getByText(/^Day: /).textContent()
+  console.log(`macro slots (expect 28): ${macroSlots}, snack rows: ${snackRows}`)
+  console.log('day footer:', footer.trim())
+  const [dayKcal, targetKcal] = [...footer.matchAll(/([\d,]+) kcal/g)].map((m) => parseInt(m[1].replace(/,/g, ''), 10))
+  const dev = Math.abs(dayKcal - targetKcal) / targetKcal
+  console.log(`day kcal ${dayKcal} vs target ${targetKcal} → ${(dev * 100).toFixed(1)}% off ${dev <= 0.1 ? '✔' : '✘ OUT OF TOLERANCE'}`)
+  await shot('16-plan-macro')
+
+  step('entry sheet: log planned meal to diary')
+  const monBfast = page.locator('.card', { hasText: /^Monday/ }).locator('.row', { hasText: 'Breakfast' }).locator('button').first()
+  const bfastTitle = (await monBfast.locator('.small').first().textContent()).trim()
+  await monBfast.click()
+  await page.getByText('protein g').waitFor()
+  await shot('17-entry-sheet')
+  await page.getByRole('button', { name: /^Log to diary/ }).click()
+  await page.getByText('Logged to the diary ✔').waitFor()
+  await page.getByRole('button', { name: 'Close' }).click()
+  // verify it landed in that Monday's diary
+  await page.getByRole('button', { name: 'Diary', exact: true }).click()
+  const daysBack = (new Date().getDay() + 6) % 7
+  for (let i = 0; i < daysBack; i++) await page.getByRole('button', { name: 'Previous day' }).click()
+  await page.locator('.card', { hasText: 'Breakfast' }).getByText(bfastTitle).waitFor()
+  console.log(`planned "${bfastTitle}" logged into Monday's diary ✔`)
+  await page.getByRole('button', { name: 'Plan', exact: true }).click()
+
+  step('spoonacular online blend (fixture)')
+  await page.getByRole('link', { name: /Settings/ }).click()
+  await page.getByPlaceholder(/Paste key…/).fill('test-key-123')
+  await page.locator('.bottom-nav').getByRole('link', { name: 'Food' }).click()
+  await page.getByRole('button', { name: 'Plan', exact: true }).click()
+  await page.getByRole('button', { name: 'Clear', exact: true }).click()
+  await page.waitForFunction(() => document.querySelectorAll('[aria-label="Remove"]').length === 0)
+  await page.getByRole('button', { name: '✨ Fill week with meals' }).click()
+  await page.getByText('Fit my macros').click()
+  await page.getByText(/catalog \+ online recipes/).waitFor({ timeout: 15000 })
+  const spoonEntry = page.getByText(/^Spoon /).first()
+  await spoonEntry.waitFor()
+  await spoonEntry.click()
+  await page.getByText('View recipe ↗').waitFor()
+  console.log('online recipes blended into macro plan with source links ✔')
+  await page.getByRole('button', { name: 'Close' }).click()
+  await page.getByRole('button', { name: 'Clear', exact: true }).click()
+  await page.waitForFunction(() => document.querySelectorAll('[aria-label="Remove"]').length === 0)
+  await page.getByRole('link', { name: /Settings/ }).click()
+  await page.getByPlaceholder(/Paste key…/).fill('')
+  await page.locator('.bottom-nav').getByRole('link', { name: 'Food' }).click()
 }
 
 step('settings + export')
