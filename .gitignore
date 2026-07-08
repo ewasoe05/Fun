@@ -5,3 +5,10 @@ dev-dist
 .env
 .DS_Store
 *.tsbuildinfo
+
+# Capacitor iOS (generated per cap sync / Xcode)
+ios/App/App/public
+ios/App/App/capacitor.config.json
+ios/App/Pods
+ios/DerivedData
+**/xcuserdata

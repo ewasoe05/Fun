@@ -35,19 +35,20 @@ npm run build:cap  # same build with a relative base — for Capacitor & other n
 npm run icons      # regenerate PWA icons (needs Chromium)
 ```
 
-### Wrapping with Capacitor
+### iOS app (Capacitor)
 
-The compiled app is plain static files in `dist/`, so a native shell just points at it:
+Capacitor is already set up: `capacitor.config.ts` points `webDir` at `dist/`, and the
+native Xcode project lives in `ios/`. On a Mac with Xcode installed:
 
 ```bash
-npm install @capacitor/core && npm install -D @capacitor/cli
-npx cap init "Lift Log" com.example.liftlog --web-dir dist
-npm run build:cap && npx cap add ios   # and/or: npx cap add android
-npx cap sync && npx cap open ios
+npm install
+npm run build:cap && npx cap sync ios
+npx cap open ios         # then run on a simulator or device from Xcode
 ```
 
 Use `npm run build:cap` (not `npm run build`) before every `cap sync` — it emits relative
-asset paths for the native webview instead of the GitHub Pages `/Fun/` base.
+asset paths for the native webview instead of the GitHub Pages `/Fun/` base. To add
+Android later: `npm i @capacitor/android && npx cap add android`.
 
 Built with Vite + React + TypeScript, Dexie (IndexedDB), Recharts, and vite-plugin-pwa.
 
