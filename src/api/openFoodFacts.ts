@@ -1,7 +1,9 @@
 import type { MacroSet } from '../types'
 
-const SEARCH_URL = 'https://world.openfoodfacts.org/cgi/search.pl'
-const PRODUCT_URL = 'https://world.openfoodfacts.org/api/v2/product'
+import { config } from '../config'
+
+const SEARCH_URL = config.offSearchUrl
+const PRODUCT_URL = config.offProductBase
 const FIELDS = 'code,product_name,brands,nutriments,serving_quantity,image_front_small_url'
 
 /** A food parsed from Open Food Facts but not yet saved to the local library. */

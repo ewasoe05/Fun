@@ -1,7 +1,8 @@
 import { db } from '../db'
 import type { Exercise } from '../types'
+import { config } from '../config'
 
-const BASE = 'https://wger.de/api/v2'
+const BASE = config.wgerApiBase
 const ENGLISH = 2 // wger language id for English
 
 /** A wger exercise parsed from the API but not yet saved to the local library. */

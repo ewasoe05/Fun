@@ -1,6 +1,8 @@
 import type { MacroSet } from '../types'
 
-const BASE = 'https://api.spoonacular.com'
+import { config } from '../config'
+
+const BASE = config.spoonacularApiBase
 
 /** An online recipe with computed nutrition (per serving). */
 export interface SpoonRecipe {
