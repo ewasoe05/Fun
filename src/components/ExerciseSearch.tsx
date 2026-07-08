@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, newId } from '../db'
 import type { Exercise } from '../types'
 import { importWgerExercise, searchWger, type WgerExercise } from '../api/wger'
+import { useOnline } from '../hooks/useOnline'
 
 interface Props {
   onSelect: (exercise: Exercise) => void
@@ -11,6 +12,7 @@ interface Props {
 
 /** Local library search plus on-demand online search of the wger exercise database. */
 export default function ExerciseSearch({ onSelect, autoFocus }: Props) {
+  const isOnline = useOnline()
   const [query, setQuery] = useState('')
   const [online, setOnline] = useState<WgerExercise[] | null>(null)
   const [searching, setSearching] = useState(false)
@@ -91,8 +93,12 @@ export default function ExerciseSearch({ onSelect, autoFocus }: Props) {
         ))}
         {q.length >= 2 && (
           <>
-            <button className="btn-ghost btn-wide" onClick={searchOnline} disabled={searching}>
-              {searching ? 'Searching wger.de…' : `Search online for “${query.trim()}”`}
+            <button className="btn-ghost btn-wide" onClick={searchOnline} disabled={searching || !isOnline}>
+              {!isOnline
+                ? 'Online search unavailable offline — your library still works'
+                : searching
+                  ? 'Searching wger.de…'
+                  : `Search online for “${query.trim()}”`}
             </button>
             {error && <p className="small" style={{ color: 'var(--danger)' }}>{error}</p>}
             {online && online.length === 0 && <p className="empty">No new online results.</p>}

@@ -4,6 +4,7 @@ import { db, newId } from '../db'
 import type { Food, MacroSet } from '../types'
 import { foodByBarcode, searchFoods, type FoodDraft } from '../api/openFoodFacts'
 import { scalePer100g } from '../lib/nutrition'
+import { useOnline } from '../hooks/useOnline'
 import BarcodeScanner from './BarcodeScanner'
 import { IconBolt, IconCamera, IconPlus, IconStar } from './icons'
 
@@ -45,6 +46,7 @@ async function saveDraft(d: FoodDraft): Promise<Food> {
 }
 
 export default function FoodPicker({ onAdd, onClose }: Props) {
+  const isOnline = useOnline()
   const [view, setView] = useState<View>({ kind: 'browse' })
   const [query, setQuery] = useState('')
   const [online, setOnline] = useState<FoodDraft[] | null>(null)
@@ -114,7 +116,12 @@ export default function FoodPicker({ onAdd, onClose }: Props) {
           {view.kind === 'browse' && (
             <>
               <div className="row" style={{ marginBottom: 10 }}>
-                <button className="btn-ghost btn-flex grow" onClick={() => setView({ kind: 'scan' })}>
+                <button
+                  className="btn-ghost btn-flex grow"
+                  disabled={!isOnline}
+                  title={isOnline ? undefined : 'Barcode lookup needs a connection'}
+                  onClick={() => setView({ kind: 'scan' })}
+                >
                   <IconCamera size={17} /> Scan
                 </button>
                 <button className="btn-ghost btn-flex grow" onClick={() => setView({ kind: 'quick' })}>
@@ -155,8 +162,12 @@ export default function FoodPicker({ onAdd, onClose }: Props) {
                 ))}
                 {q.length >= 2 && (
                   <>
-                    <button className="btn-ghost btn-wide" onClick={searchOnline} disabled={busy}>
-                      {busy ? 'Searching Open Food Facts…' : `Search online for “${query.trim()}”`}
+                    <button className="btn-ghost btn-wide" onClick={searchOnline} disabled={busy || !isOnline}>
+                      {!isOnline
+                        ? 'Online food search unavailable offline — saved foods, quick add & custom still work'
+                        : busy
+                          ? 'Searching Open Food Facts…'
+                          : `Search online for “${query.trim()}”`}
                     </button>
                     {online && online.length === 0 && <p className="empty">No online results.</p>}
                     {online?.map((d) => (

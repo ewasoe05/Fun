@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db, newId } from '../db'
 import type { Recipe } from '../types'
 import { randomMeal, searchMeals, type MealDraft } from '../api/mealdb'
+import { useOnline } from '../hooks/useOnline'
 import { IconDice } from '../components/icons'
 
 /** Upsert a TheMealDB draft locally (not yet in the cookbook) and return its id. */
@@ -31,6 +32,7 @@ async function draftToRecipe(d: MealDraft): Promise<string> {
 
 export default function RecipesTab() {
   const navigate = useNavigate()
+  const online = useOnline()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<MealDraft[] | null>(null)
   const [busy, setBusy] = useState(false)
@@ -73,12 +75,12 @@ export default function RecipesTab() {
           }}
           onKeyDown={(e) => e.key === 'Enter' && query.trim() && search()}
         />
-        <button className="btn-primary" disabled={busy || !query.trim()} onClick={search}>
+        <button className="btn-primary" disabled={busy || !query.trim() || !online} onClick={search}>
           Search
         </button>
       </div>
-      <button className="btn-ghost btn-flex btn-wide" disabled={busy} onClick={surprise}>
-        <IconDice size={17} /> Surprise me with a random recipe
+      <button className="btn-ghost btn-flex btn-wide" disabled={busy || !online} onClick={surprise}>
+        <IconDice size={17} /> {online ? 'Surprise me with a random recipe' : 'Recipe search unavailable offline — your cookbook still works'}
       </button>
       {error && <p className="small" style={{ color: 'var(--danger)' }}>{error}</p>}
       {busy && <p className="muted small">Searching TheMealDB…</p>}

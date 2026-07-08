@@ -5,6 +5,7 @@ import { db, newId } from '../db'
 import type { PlanEntry, PlanMeal } from '../types'
 import { PLAN_MEALS } from '../types'
 import { useSettings } from '../hooks/useSettings'
+import { useOnline } from '../hooks/useOnline'
 import { addDays, formatDateKey, todayKey, weekStart } from '../lib/nutrition'
 import { clearWeek, fillWeek } from '../lib/mealPlanner'
 import { fillWeekMacros } from '../lib/macroPlanner'
@@ -19,6 +20,7 @@ const MEAL_LABELS: Record<PlanMeal, string> = {
 export default function PlanTab() {
   const navigate = useNavigate()
   const settings = useSettings()
+  const online = useOnline()
   const [start, setStart] = useState(weekStart(todayKey()))
   const [slot, setSlot] = useState<{ date: string; meal: PlanMeal } | null>(null)
   const [sheet, setSheet] = useState<PlanEntry | null>(null)
@@ -179,14 +181,16 @@ export default function PlanTab() {
                 <div style={{ fontWeight: 600 }}>🎯 Fit my macros</div>
                 <div className="muted small" style={{ marginTop: 4 }}>
                   Meals & snacks portioned to hit the daily calories, protein, carbs, and fat calculated from your
-                  stats. Uses the built-in meal catalog{settings.spoonacularKey ? ' plus online recipes' : ''} — works
-                  offline.
+                  stats. Uses the built-in meal catalog
+                  {settings.spoonacularKey && online ? ' plus online recipes' : ''} — works fully offline.
                 </div>
               </button>
               <button className="card" style={{ textAlign: 'left', minHeight: 0 }} onClick={() => autoFill('recipes')}>
                 <div style={{ fontWeight: 600 }}>🎲 Surprise recipes</div>
                 <div className="muted small" style={{ marginTop: 4 }}>
-                  Real recipes with photos and instructions from TheMealDB (your cookbook first). No macro fitting.
+                  {online
+                    ? 'Real recipes with photos and instructions from TheMealDB (your cookbook first). No macro fitting.'
+                    : 'Offline: fills from your saved cookbook only.'}
                 </div>
               </button>
             </div>
