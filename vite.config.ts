@@ -2,9 +2,15 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
-// Served from https://ewasoe05.github.io/Fun/
+// Two build targets from the same source:
+// - default: GitHub Pages at https://ewasoe05.github.io/Fun/ (absolute /Fun/ base)
+// - CAP_BUILD=1 (npm run build:cap): relative base for native wrappers like
+//   Capacitor, whose webview serves dist/ from its own root
+const capBuild = !!process.env.CAP_BUILD
+const base = capBuild ? './' : '/Fun/'
+
 export default defineConfig({
-  base: '/Fun/',
+  base,
   plugins: [
     react(),
     VitePWA({
@@ -26,7 +32,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        navigateFallback: '/Fun/index.html',
+        navigateFallback: capBuild ? 'index.html' : '/Fun/index.html',
         runtimeCaching: [
           {
             // wger exercise images: cache-first so the library works offline

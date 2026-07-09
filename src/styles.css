@@ -345,6 +345,20 @@ a.text-link { color: var(--accent); }
 .suggest-down { color: #eda100; background: color-mix(in srgb, #eda100 13%, transparent); }
 .suggest-swap { color: var(--accent); background: color-mix(in srgb, var(--accent) 13%, transparent); }
 
+.offline-banner {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(58px + env(safe-area-inset-bottom));
+  z-index: 15;
+  text-align: center;
+  font-size: 12px;
+  padding: 5px 12px;
+  color: #eda100;
+  background: color-mix(in srgb, #eda100 14%, var(--page));
+  border-top: 1px solid color-mix(in srgb, #eda100 30%, transparent);
+}
+
 .gym-chip {
   display: inline-flex;
   align-items: center;

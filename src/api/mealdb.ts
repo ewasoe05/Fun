@@ -1,6 +1,8 @@
 import type { RecipeIngredient } from '../types'
 
-const BASE = 'https://www.themealdb.com/api/json/v1/1'
+import { config } from '../config'
+
+const BASE = config.mealdbApiBase
 
 /** A recipe parsed from TheMealDB but not yet saved locally. */
 export interface MealDraft {

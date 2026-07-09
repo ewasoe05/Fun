@@ -30,9 +30,25 @@ Your workout data lives only on your device. Use **Settings → Export data** fo
 ```bash
 npm install
 npm run dev        # local dev server
-npm run build      # type-check + production build to dist/
+npm run build      # type-check + production build to dist/ (GitHub Pages base /Fun/)
+npm run build:cap  # same build with a relative base — for Capacitor & other native wrappers
 npm run icons      # regenerate PWA icons (needs Chromium)
 ```
+
+### iOS app (Capacitor)
+
+Capacitor is already set up: `capacitor.config.ts` points `webDir` at `dist/`, and the
+native Xcode project lives in `ios/`. On a Mac with Xcode installed:
+
+```bash
+npm install
+npm run build:cap && npx cap sync ios
+npx cap open ios         # then run on a simulator or device from Xcode
+```
+
+Use `npm run build:cap` (not `npm run build`) before every `cap sync` — it emits relative
+asset paths for the native webview instead of the GitHub Pages `/Fun/` base. To add
+Android later: `npm i @capacitor/android && npx cap add android`.
 
 Built with Vite + React + TypeScript, Dexie (IndexedDB), Recharts, and vite-plugin-pwa.
 

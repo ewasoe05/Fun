@@ -1,5 +1,6 @@
 import { HashRouter, Route, Routes } from 'react-router-dom'
 import BottomNav from './components/BottomNav'
+import { useOnline } from './hooks/useOnline'
 import WorkoutScreen from './screens/WorkoutScreen'
 import RoutinesScreen from './screens/RoutinesScreen'
 import RoutineEditScreen from './screens/RoutineEditScreen'
@@ -12,9 +13,13 @@ import RecipeDetailScreen from './screens/RecipeDetailScreen'
 import CoachScreen from './screens/CoachScreen'
 
 export default function App() {
+  const online = useOnline()
   return (
     <HashRouter>
       <div className="app">
+        {!online && (
+          <div className="offline-banner">Offline — logging, plans & progress all work. Online search paused.</div>
+        )}
         <main className="screen">
           <Routes>
             <Route path="/" element={<WorkoutScreen />} />
